@@ -46,6 +46,43 @@ public class AccountService {
                 .orElseThrow(() -> new IllegalArgumentException("Account not found: " + id));
     }
 
+    @Transactional
+    public Account deposit(Long accountId, BigDecimal amount) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Deposit amount must be positive");
+        }
+
+        Account account = getById(accountId);
+
+        if (!"ACTIVE".equals(account.getStatus())) {
+            throw new IllegalArgumentException("Only ACTIVE accounts can receive deposits");
+        }
+
+        account.deposit(amount);
+        return account;
+    }
+
+    @Transactional
+    public Account withdraw(Long accountId, BigDecimal amount) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Withdrawal amount must be positive");
+        }
+
+        Account account = getById(accountId);
+
+        if (!"ACTIVE".equals(account.getStatus())) {
+            throw new IllegalArgumentException("Only ACTIVE accounts can perform withdrawals");
+        }
+
+        if (account.getBalance().compareTo(amount) < 0) {
+            throw new IllegalArgumentException("Insufficient funds");
+        }
+
+        account.withdraw(amount);
+        return account;
+    }
+
+
     private String generateAccountNumber() {
         long num = (long) (Math.random() * 1_000_000_0000L);
         return String.format("%010d", num);
