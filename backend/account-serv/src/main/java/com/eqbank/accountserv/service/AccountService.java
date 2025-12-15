@@ -96,6 +96,13 @@ public class AccountService {
         return account;
     }
 
+    @Transactional
+    public Account unfreezeAccount(Long id) {
+        Account account = getById(id);
+        account.unfreeze();
+        return account;
+    }
+
 
     private String generateAccountNumber() {
         long num = (long) (Math.random() * 1_000_000_0000L);

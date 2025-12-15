@@ -73,4 +73,10 @@ public class AccountController {
         return ResponseEntity.ok(service.closeAccount(id));
     }
 
+    @PostMapping("/{id}/unfreeze")
+    public ResponseEntity<Account> unfreeze(@PathVariable Long id) {
+        return ResponseEntity.ok(service.unfreezeAccount(id));
+    }
+
+
 }

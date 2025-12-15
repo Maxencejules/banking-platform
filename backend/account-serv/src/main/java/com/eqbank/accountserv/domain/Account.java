@@ -92,4 +92,12 @@ public class Account {
         }
         this.status = "CLOSED";
     }
+
+    public void unfreeze() {
+        if (!"FROZEN".equals(this.status)) {
+            throw new IllegalStateException("Only FROZEN accounts can be unfrozen");
+        }
+        this.status = "ACTIVE";
+    }
+
 }
