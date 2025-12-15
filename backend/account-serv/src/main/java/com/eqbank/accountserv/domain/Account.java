@@ -78,4 +78,18 @@ public class Account {
         this.balance = this.balance.subtract(amount);
         this.updatedAt = LocalDateTime.now();
     }
+
+    public void freeze() {
+        if (!"ACTIVE".equals(this.status)) {
+            throw new IllegalStateException("Only ACTIVE accounts can be frozen");
+        }
+        this.status = "FROZEN";
+    }
+
+    public void close() {
+        if (!"ACTIVE".equals(this.status) && !"FROZEN".equals(this.status)) {
+            throw new IllegalStateException("Only ACTIVE or FROZEN accounts can be closed");
+        }
+        this.status = "CLOSED";
+    }
 }

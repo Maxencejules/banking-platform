@@ -62,4 +62,15 @@ public class AccountController {
         Account updated = service.withdraw(id, request.getAmount());
         return ResponseEntity.ok(updated);
     }
+
+    @PostMapping("/{id}/freeze")
+    public ResponseEntity<Account> freeze(@PathVariable Long id) {
+        return ResponseEntity.ok(service.freezeAccount(id));
+    }
+
+    @PostMapping("/{id}/close")
+    public ResponseEntity<Account> close(@PathVariable Long id) {
+        return ResponseEntity.ok(service.closeAccount(id));
+    }
+
 }

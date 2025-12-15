@@ -82,6 +82,20 @@ public class AccountService {
         return account;
     }
 
+    @Transactional
+    public Account freezeAccount(Long id) {
+        Account account = getById(id);
+        account.freeze();
+        return account;
+    }
+
+    @Transactional
+    public Account closeAccount(Long id) {
+        Account account = getById(id);
+        account.close();
+        return account;
+    }
+
 
     private String generateAccountNumber() {
         long num = (long) (Math.random() * 1_000_000_0000L);
