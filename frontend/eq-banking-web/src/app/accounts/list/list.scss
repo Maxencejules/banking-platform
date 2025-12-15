@@ -326,3 +326,29 @@ tr:hover td {
     color: #9ca3af;
   }
 }
+
+/* Center the create-form inputs inside the card */
+.card-form {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Only affects the grid in the create card */
+.card-form .form-grid {
+  margin-top: 0.75rem;
+
+  /* 2 columns: Name + Email on top, Balance + Currency below */
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 0.75rem;
+  row-gap: 0.75rem;
+
+  /* keep it nicely centered and not too wide */
+  max-width: 520px;
+  margin-inline: auto;
+}
+
+.card-form .field {
+  width: 100%;
+}
+
