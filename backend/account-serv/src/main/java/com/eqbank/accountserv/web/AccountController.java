@@ -1,7 +1,9 @@
 package com.eqbank.accountserv.web;
 
 import com.eqbank.accountserv.domain.Account;
+import com.eqbank.accountserv.dto.CreateAccountRequest;
 import com.eqbank.accountserv.service.AccountService;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -21,13 +23,16 @@ public class AccountController {
     }
 
     @PostMapping
-    public ResponseEntity<Account> createAccount(@RequestBody Map<String, Object> payload) {
-        String ownerName = (String) payload.get("ownerName");
-        String ownerEmail = (String) payload.get("ownerEmail");
-        BigDecimal initialBalance = new BigDecimal(payload.get("initialBalance").toString());
-        String currency = (String) payload.get("currency");
+    public ResponseEntity<Account> createAccount(
+            @Valid @RequestBody CreateAccountRequest request
+    ) {
+        Account created = service.createAccount(
+                request.getOwnerName(),
+                request.getOwnerEmail(),
+                request.getInitialBalance(),
+                request.getCurrency()
+        );
 
-        Account created = service.createAccount(ownerName, ownerEmail, initialBalance, currency);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
