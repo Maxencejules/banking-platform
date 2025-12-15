@@ -2,6 +2,7 @@ import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Account, AccountService } from '../../services/account';
+import { ToastService } from '../../services/toast.service';
 
 @Component({
   selector: 'app-list',
@@ -22,13 +23,17 @@ export class ListComponent {
   initialBalance = 1000;
   currency = 'CAD';
 
-  constructor(private accountService: AccountService) {
+  constructor(
+    private accountService: AccountService,
+    private toast: ToastService
+  ) {
     this.loadAccounts();
   }
 
   loadAccounts(): void {
     this.loading = true;
     this.error = null;
+
     this.accountService.getAll().subscribe({
       next: data => {
         this.accounts = data;
@@ -37,6 +42,7 @@ export class ListComponent {
       error: err => {
         console.error(err);
         this.error = 'Failed to load accounts';
+        this.toast.error('Failed to load accounts');
         this.loading = false;
       }
     });
@@ -44,6 +50,7 @@ export class ListComponent {
 
   createAccount(): void {
     this.error = null;
+
     this.accountService.create({
       ownerName: this.ownerName,
       ownerEmail: this.ownerEmail,
@@ -55,68 +62,102 @@ export class ListComponent {
         this.ownerEmail = '';
         this.initialBalance = 1000;
         this.currency = 'CAD';
+
+        this.toast.success('Account created successfully');
         this.loadAccounts();
       },
       error: err => {
         console.error(err);
+
         if (err.status === 400 && err.error) {
-          // assume backend sends { field: "message", ... }
           const messages = Object.values(err.error as Record<string, string>);
-          this.error = messages.join(' | ');
+          const msg = messages.join(' | ');
+          this.error = msg;
+          this.toast.error(msg);
         } else {
           this.error = 'Create failed';
+          this.toast.error('Create failed');
         }
       }
     });
   }
 
-
   quickDeposit(acc: Account): void {
+    this.error = null;
+
     this.accountService.deposit(acc.id, 100).subscribe({
-      next: () => this.loadAccounts(),
+      next: () => {
+        this.toast.success(`Deposited 100 into ${acc.accountNumber}`);
+        this.loadAccounts();
+      },
       error: err => {
         console.error(err);
         this.error = 'Deposit failed';
+        this.toast.error('Deposit failed');
       }
     });
   }
 
   quickWithdraw(acc: Account): void {
+    this.error = null;
+
     this.accountService.withdraw(acc.id, 50).subscribe({
-      next: () => this.loadAccounts(),
+      next: () => {
+        this.toast.success(`Withdrew 50 from ${acc.accountNumber}`);
+        this.loadAccounts();
+      },
       error: err => {
         console.error(err);
         this.error = 'Withdraw failed';
+        this.toast.error('Withdraw failed');
       }
     });
   }
 
   freeze(acc: Account): void {
+    this.error = null;
+
     this.accountService.freeze(acc.id).subscribe({
-      next: () => this.loadAccounts(),
+      next: () => {
+        this.toast.success(`Account ${acc.accountNumber} frozen`);
+        this.loadAccounts();
+      },
       error: err => {
         console.error(err);
         this.error = 'Freeze failed';
+        this.toast.error('Freeze failed');
       }
     });
   }
 
   unfreeze(acc: Account): void {
+    this.error = null;
+
     this.accountService.unfreeze(acc.id).subscribe({
-      next: () => this.loadAccounts(),
+      next: () => {
+        this.toast.success(`Account ${acc.accountNumber} unfrozen`);
+        this.loadAccounts();
+      },
       error: err => {
         console.error(err);
         this.error = 'Unfreeze failed';
+        this.toast.error('Unfreeze failed');
       }
     });
   }
 
   close(acc: Account): void {
+    this.error = null;
+
     this.accountService.close(acc.id).subscribe({
-      next: () => this.loadAccounts(),
+      next: () => {
+        this.toast.success(`Account ${acc.accountNumber} closed`);
+        this.loadAccounts();
+      },
       error: err => {
         console.error(err);
         this.error = 'Close failed';
+        this.toast.error('Close failed');
       }
     });
   }

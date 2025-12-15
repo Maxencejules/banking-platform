@@ -11,50 +11,48 @@ export interface Account {
   balance: number;
   currency: string;
   status: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
-export interface CreateAccountRequest {
-  ownerName: string;
-  ownerEmail: string;
-  initialBalance: number;
-  currency: string;
-}
-
-@Injectable({
-  providedIn: 'root'
-})
+@Injectable({ providedIn: 'root' })
 export class AccountService {
 
-  private base = environment.apiBaseUrl;
-  private accountsUrl = `${this.base}/accounts`;
+  // this will be http://localhost:8081/api/accounts
+  private readonly baseUrl = `${environment.apiBaseUrl}/accounts`;
 
   constructor(private http: HttpClient) {}
 
   getAll(): Observable<Account[]> {
-    return this.http.get<Account[]>(this.accountsUrl);
+    return this.http.get<Account[]>(this.baseUrl);
   }
 
-  create(body: CreateAccountRequest): Observable<Account> {
-    return this.http.post<Account>(this.accountsUrl, body);
+  create(payload: {
+    ownerName: string;
+    ownerEmail: string;
+    initialBalance: number;
+    currency: string;
+  }): Observable<Account> {
+    return this.http.post<Account>(this.baseUrl, payload);
   }
 
-  deposit(id: number, amount: number): Observable<Account> {
-    return this.http.post<Account>(`${this.accountsUrl}/${id}/deposit`, { amount });
+  deposit(id: number, amount: number) {
+    return this.http.post(`${this.baseUrl}/${id}/deposit`, { amount });
   }
 
-  withdraw(id: number, amount: number): Observable<Account> {
-    return this.http.post<Account>(`${this.accountsUrl}/${id}/withdraw`, { amount });
+  withdraw(id: number, amount: number) {
+    return this.http.post(`${this.baseUrl}/${id}/withdraw`, { amount });
   }
 
-  freeze(id: number): Observable<Account> {
-    return this.http.post<Account>(`${this.accountsUrl}/${id}/freeze`, {});
+  freeze(id: number) {
+    return this.http.post(`${this.baseUrl}/${id}/freeze`, {});
   }
 
-  unfreeze(id: number): Observable<Account> {
-    return this.http.post<Account>(`${this.accountsUrl}/${id}/unfreeze`, {});
+  unfreeze(id: number) {
+    return this.http.post(`${this.baseUrl}/${id}/unfreeze`, {});
   }
 
-  close(id: number): Observable<Account> {
-    return this.http.post<Account>(`${this.accountsUrl}/${id}/close`, {});
+  close(id: number) {
+    return this.http.post(`${this.baseUrl}/${id}/close`, {});
   }
 }

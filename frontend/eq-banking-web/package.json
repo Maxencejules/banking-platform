@@ -1,13 +1,15 @@
 {
   "name": "eq-banking-web",
   "version": "0.0.0",
+  "private": true,
+  "packageManager": "npm@11.6.2",
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
     "build": "ng build",
+    "build:backend": "ng build --configuration production --output-path C:/Users/USER/Desktop/eq-banking-platform/backend/account-serv/src/main/resources/static",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test",
-    "serve:ssr:eq-banking-web": "node dist/eq-banking-web/server/server.mjs"
+    "test": "ng test"
   },
   "prettier": {
     "printWidth": 100,
@@ -21,8 +23,6 @@
       }
     ]
   },
-  "private": true,
-  "packageManager": "npm@11.6.2",
   "dependencies": {
     "@angular/common": "^21.0.0",
     "@angular/compiler": "^21.0.0",
@@ -47,3 +47,4 @@
     "vitest": "^4.0.8"
   }
 }
+
