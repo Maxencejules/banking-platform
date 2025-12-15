@@ -1,0 +1,75 @@
+<h1>EQ Banking - Accounts</h1>
+
+<div *ngIf="error" style="color: red; margin-bottom: 1rem;">
+  {{ error }}
+</div>
+
+<section style="margin-bottom: 2rem;">
+  <h2>Create account</h2>
+  <form (ngSubmit)="createAccount()">
+    <label>
+      Name:
+      <input [(ngModel)]="ownerName" name="ownerName" required>
+    </label>
+
+    <label>
+      Email:
+      <input [(ngModel)]="ownerEmail" name="ownerEmail" type="email" required>
+    </label>
+
+    <label>
+      Initial balance:
+      <input [(ngModel)]="initialBalance" name="initialBalance" type="number" step="0.01">
+    </label>
+
+    <label>
+      Currency:
+      <input [(ngModel)]="currency" name="currency" maxlength="3">
+    </label>
+
+    <button type="submit" [disabled]="loading">Create</button>
+  </form>
+</section>
+
+<section>
+  <h2>All accounts</h2>
+
+  <div *ngIf="loading">Loading...</div>
+
+  <table *ngIf="!loading && accounts.length">
+    <thead>
+    <tr>
+      <th>ID</th>
+      <th>Account #</th>
+      <th>Owner</th>
+      <th>Email</th>
+      <th>Balance</th>
+      <th>Currency</th>
+      <th>Status</th>
+      <th>Actions</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr *ngFor="let acc of accounts">
+      <td>{{ acc.id }}</td>
+      <td>{{ acc.accountNumber }}</td>
+      <td>{{ acc.ownerName }}</td>
+      <td>{{ acc.ownerEmail }}</td>
+      <td>{{ acc.balance }}</td>
+      <td>{{ acc.currency }}</td>
+      <td>{{ acc.status }}</td>
+      <td>
+        <button (click)="quickDeposit(acc)">+100</button>
+        <button (click)="quickWithdraw(acc)">-50</button>
+        <button (click)="freeze(acc)">Freeze</button>
+        <button (click)="unfreeze(acc)">Unfreeze</button>
+        <button (click)="close(acc)">Close</button>
+      </td>
+    </tr>
+    </tbody>
+  </table>
+
+  <div *ngIf="!loading && !accounts.length">
+    No accounts yet.
+  </div>
+</section>
