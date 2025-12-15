@@ -1,1 +1,31 @@
-<p>create works!</p>
+<div class="create-card">
+  <h2>Create account</h2>
+
+  <div class="form-grid">
+    <div class="form-field">
+      <label>Name</label>
+      <input type="text" [(ngModel)]="name" placeholder="Alex Martin" />
+    </div>
+
+    <div class="form-field">
+      <label>Email</label>
+      <input type="email" [(ngModel)]="email" placeholder="alex@example.com" />
+    </div>
+
+    <div class="form-field">
+      <label>Initial balance</label>
+      <input type="number" [(ngModel)]="initialBalance" placeholder="1000" />
+    </div>
+
+    <div class="form-field">
+      <label>Currency</label>
+      <input type="text" [(ngModel)]="currency" placeholder="CAD" />
+    </div>
+  </div>
+
+  <button class="primary-btn" (click)="createAccount()">Create account</button>
+
+  <p class="note">
+    Validation is enforced on the backend – invalid data will return detailed messages.
+  </p>
+</div>

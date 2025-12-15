@@ -1,75 +1,150 @@
-<h1>EQ Banking - Accounts</h1>
+<div class="page">
+  <header class="page-header">
+    <div>
+      <h1>EQ Banking – Accounts</h1>
+      <p class="page-subtitle">
+        Monitor balances, statuses and quickly simulate common account operations.
+      </p>
+    </div>
 
-<div *ngIf="error" style="color: red; margin-bottom: 1rem;">
-  {{ error }}
+    <div class="status-pill" *ngIf="accounts.length">
+      {{ accounts.length }} account{{ accounts.length > 1 ? 's' : '' }} total
+    </div>
+  </header>
+
+  <main class="layout">
+    <!-- LEFT: Create account card (already wired to createAccount()) -->
+    <section class="card card-form">
+      <h2>Create account</h2>
+
+      <form class="form-grid" (ngSubmit)="createAccount()">
+        <label class="field">
+          <span>Name</span>
+          <input
+            [(ngModel)]="ownerName"
+            name="ownerName"
+            required
+            placeholder="Alex Martin"
+          />
+        </label>
+
+        <label class="field">
+          <span>Email</span>
+          <input
+            [(ngModel)]="ownerEmail"
+            name="ownerEmail"
+            type="email"
+            required
+            placeholder="alex@example.com"
+          />
+        </label>
+
+        <label class="field">
+          <span>Initial balance</span>
+          <input
+            [(ngModel)]="initialBalance"
+            name="initialBalance"
+            type="number"
+            step="0.01"
+            min="0"
+          />
+        </label>
+
+        <label class="field">
+          <span>Currency</span>
+          <input
+            [(ngModel)]="currency"
+            name="currency"
+            maxlength="3"
+            class="currency-input"
+          />
+        </label>
+
+        <div class="actions">
+          <button
+            type="submit"
+            class="btn btn-primary"
+            [disabled]="loading || !ownerName || !ownerEmail"
+          >
+            {{ loading ? 'Creating…' : 'Create account' }}
+          </button>
+        </div>
+      </form>
+
+      <p class="helper-text">
+        Validation is enforced on the backend – invalid data will return detailed messages.
+      </p>
+
+      <div *ngIf="error" class="alert alert-error">
+        {{ error }}
+      </div>
+    </section>
+
+    <!-- RIGHT: Accounts table -->
+    <section class="card card-table">
+      <div class="card-header">
+        <h2>All accounts</h2>
+      </div>
+
+      <div *ngIf="loading && !accounts.length" class="loading">
+        Loading accounts…
+      </div>
+
+      <div *ngIf="!loading && !accounts.length" class="empty-state">
+        <p>No accounts yet.</p>
+        <p class="empty-hint">Create one on the left to get started.</p>
+      </div>
+
+      <div class="table-wrapper" *ngIf="accounts.length">
+        <table>
+          <thead>
+          <tr>
+            <th>ID</th>
+            <th>Account #</th>
+            <th>Owner</th>
+            <th>Email</th>
+            <th>Balance</th>
+            <th>Status</th>
+            <th style="width: 260px;">Actions</th>
+          </tr>
+          </thead>
+          <tbody>
+          <tr *ngFor="let acc of accounts">
+            <td>{{ acc.id }}</td>
+            <td class="mono">{{ acc.accountNumber }}</td>
+            <td>{{ acc.ownerName }}</td>
+            <td class="mono email-cell">{{ acc.ownerEmail }}</td>
+            <td class="mono balance" [ngClass]="{'negative': acc.balance < 0}">
+              {{ acc.balance | number:'1.2-2' }} {{ acc.currency }}
+            </td>
+            <td>
+              <span class="status" [ngClass]="'status-' + acc.status.toLowerCase()">
+                {{ acc.status }}
+              </span>
+            </td>
+            <td>
+              <div class="btn-row">
+                <button class="btn btn-small" (click)="quickDeposit(acc)">
+                  +100
+                </button>
+                <button class="btn btn-small" (click)="quickWithdraw(acc)">
+                  -50
+                </button>
+                <button class="btn btn-small btn-outline" (click)="freeze(acc)">
+                  Freeze
+                </button>
+                <button class="btn btn-small btn-outline" (click)="unfreeze(acc)">
+                  Unfreeze
+                </button>
+                <button class="btn btn-small btn-danger" (click)="close(acc)">
+                  Close
+                </button>
+              </div>
+            </td>
+          </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
 </div>
-
-<section style="margin-bottom: 2rem;">
-  <h2>Create account</h2>
-  <form (ngSubmit)="createAccount()">
-    <label>
-      Name:
-      <input [(ngModel)]="ownerName" name="ownerName" required>
-    </label>
-
-    <label>
-      Email:
-      <input [(ngModel)]="ownerEmail" name="ownerEmail" type="email" required>
-    </label>
-
-    <label>
-      Initial balance:
-      <input [(ngModel)]="initialBalance" name="initialBalance" type="number" step="0.01">
-    </label>
-
-    <label>
-      Currency:
-      <input [(ngModel)]="currency" name="currency" maxlength="3">
-    </label>
-
-    <button type="submit" [disabled]="loading">Create</button>
-  </form>
-</section>
-
-<section>
-  <h2>All accounts</h2>
-
-  <div *ngIf="loading">Loading...</div>
-
-  <table *ngIf="!loading && accounts.length">
-    <thead>
-    <tr>
-      <th>ID</th>
-      <th>Account #</th>
-      <th>Owner</th>
-      <th>Email</th>
-      <th>Balance</th>
-      <th>Currency</th>
-      <th>Status</th>
-      <th>Actions</th>
-    </tr>
-    </thead>
-    <tbody>
-    <tr *ngFor="let acc of accounts">
-      <td>{{ acc.id }}</td>
-      <td>{{ acc.accountNumber }}</td>
-      <td>{{ acc.ownerName }}</td>
-      <td>{{ acc.ownerEmail }}</td>
-      <td>{{ acc.balance }}</td>
-      <td>{{ acc.currency }}</td>
-      <td>{{ acc.status }}</td>
-      <td>
-        <button (click)="quickDeposit(acc)">+100</button>
-        <button (click)="quickWithdraw(acc)">-50</button>
-        <button (click)="freeze(acc)">Freeze</button>
-        <button (click)="unfreeze(acc)">Unfreeze</button>
-        <button (click)="close(acc)">Close</button>
-      </td>
-    </tr>
-    </tbody>
-  </table>
-
-  <div *ngIf="!loading && !accounts.length">
-    No accounts yet.
-  </div>
-</section>

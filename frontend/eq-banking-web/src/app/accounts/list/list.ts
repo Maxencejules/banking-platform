@@ -59,10 +59,17 @@ export class ListComponent {
       },
       error: err => {
         console.error(err);
-        this.error = 'Create failed';
+        if (err.status === 400 && err.error) {
+          // assume backend sends { field: "message", ... }
+          const messages = Object.values(err.error as Record<string, string>);
+          this.error = messages.join(' | ');
+        } else {
+          this.error = 'Create failed';
+        }
       }
     });
   }
+
 
   quickDeposit(acc: Account): void {
     this.accountService.deposit(acc.id, 100).subscribe({
