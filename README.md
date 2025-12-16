@@ -33,9 +33,10 @@ eq-banking-platform/
 │
 ├── frontend/
 │   └── eq-banking-web/      # Angular application
-│       ├── accounts/        # Feature module
-│       ├── services/        # API services
-│       └── ui/              # Components & styles
+│       └── src/
+│           ├── accounts/        # Feature module
+│           ├── services/        # API services
+│           └── ui/              # Components & styles
 └── README.md
 ```
 
