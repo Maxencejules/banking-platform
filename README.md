@@ -1,4 +1,4 @@
-# EQ Banking Platform
+# MJ Banking Platform
 
 A full‑stack **digital banking accounts platform** inspired by EQ Bank, built with **Spring Boot** and **Angular**. This project demonstrates modern backend API design, frontend integration, validation, testing, and clean architecture practices aligned with real‑world financial systems.
 
