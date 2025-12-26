@@ -1,183 +1,213 @@
 <div class="page">
 
-  <!-- Header -->
-  <header class="page-header">
-    <div>
-      <h1>MJ Banking – Accounts</h1>
-      <p class="page-subtitle">
-        Monitor balances, statuses and quickly simulate common account operations.
-      </p>
+  <!-- Navbar -->
+  <nav class="navbar">
+    <div class="navbar-brand">
+      <div class="logo-icon">MJ</div>
+      <span class="brand-text">Banking</span>
     </div>
 
-    <div *ngIf="accounts.length > 0" class="status-pill">
-      {{ accounts.length }} account{{ accounts.length === 1 ? '' : 's' }} total
+    <div class="navbar-actions">
+      <div class="user-profile">
+        <span class="user-name">Admin User</span>
+        <div class="avatar">A</div>
+      </div>
+
+      <button class="btn-icon theme-toggle" (click)="toggleTheme()" [title]="isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'">
+        <span *ngIf="!isDarkMode">🌙</span>
+        <span *ngIf="isDarkMode">☀️</span>
+      </button>
     </div>
-  </header>
+  </nav>
 
-  <div class="layout">
+  <!-- Dashboard Content -->
+  <main class="dashboard-content">
 
-    <!-- LEFT: CREATE ACCOUNT CARD -->
-    <section class="card card-form">
-      <h2>Create account</h2>
+    <!-- Stats Row -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-label">Total Balance</div>
+        <div class="stat-value">{{ totalBalance | number:'1.2-2' }} <span class="currency">CAD</span></div>
+      </div>
 
-      <div class="form-grid">
-        <div class="field">
-          <span>Name</span>
-          <input
-            type="text"
-            [(ngModel)]="ownerName"
-            placeholder="Alex Martin" />
+      <div class="stat-card">
+        <div class="stat-label">Total Accounts</div>
+        <div class="stat-value">{{ accounts.length }}</div>
+      </div>
+
+      <div class="stat-card highlight">
+        <div class="stat-label">Status</div>
+        <div class="stat-value system-ok">System Operational</div>
+      </div>
+    </div>
+
+    <div class="layout">
+
+      <!-- LEFT: CREATE ACCOUNT CARD -->
+      <section class="card card-form">
+        <div class="card-header-clean">
+          <h2>New Account</h2>
+          <p class="card-subtitle">Open a new banking account instantly.</p>
         </div>
 
-        <div class="field">
-          <span>Email</span>
-          <input
-            type="email"
-            [(ngModel)]="ownerEmail"
-            placeholder="alex@example.com" />
+        <div class="form-grid">
+          <div class="field">
+            <label>Owner Name</label>
+            <input
+              type="text"
+              [(ngModel)]="ownerName"
+              placeholder="e.g. Alex Martin" />
+          </div>
+
+          <div class="field">
+            <label>Email Address</label>
+            <input
+              type="email"
+              [(ngModel)]="ownerEmail"
+              placeholder="alex@example.com" />
+          </div>
+
+          <div class="field-row">
+            <div class="field">
+              <label>Initial Balance</label>
+              <input
+                type="number"
+                [(ngModel)]="initialBalance"
+                placeholder="1000" />
+            </div>
+
+            <div class="field">
+              <label>Currency</label>
+              <input
+                type="text"
+                class="currency-input"
+                [(ngModel)]="currency"
+                maxlength="3"
+                placeholder="CAD" />
+            </div>
+          </div>
         </div>
 
-        <div class="field">
-          <span>Initial balance</span>
-          <input
-            type="number"
-            [(ngModel)]="initialBalance"
-            placeholder="1000" />
+        <div class="actions">
+          <button class="btn btn-primary btn-block" (click)="createAccount()">
+            Create Account
+          </button>
+        </div>
+      </section>
+
+      <!-- RIGHT: ACCOUNTS TABLE CARD -->
+      <section class="card card-table">
+        <div class="card-header-flex">
+          <h2>Active Accounts</h2>
+          <button class="btn btn-small btn-outline" (click)="loadAccounts()">
+            Refresh
+          </button>
         </div>
 
-        <div class="field">
-          <span>Currency</span>
-          <input
-            type="text"
-            class="currency-input"
-            [(ngModel)]="currency"
-            maxlength="3"
-            placeholder="CAD" />
+        <!-- Error banner -->
+        <div *ngIf="error" class="alert alert-error">
+          {{ error }}
         </div>
-      </div>
 
-      <div class="actions">
-        <button class="btn btn-primary" (click)="createAccount()">
-          Create account
-        </button>
-      </div>
+        <!-- Loading state -->
+        <div *ngIf="loading" class="loading-state">
+          <div class="spinner"></div>
+          <span>Loading accounts...</span>
+        </div>
 
-      <p class="helper-text">
-        Validation is enforced on the backend – invalid data will return detailed messages.
-      </p>
-    </section>
+        <!-- Empty state -->
+        <div *ngIf="!loading && accounts.length === 0" class="empty-state">
+          <div class="empty-icon">📂</div>
+          <h3>No accounts found</h3>
+          <p>Get started by creating a new account on the left.</p>
+        </div>
 
-    <!-- RIGHT: ACCOUNTS TABLE CARD -->
-    <section class="card card-table">
-      <div class="card-header">
-        <h2>All accounts</h2>
-      </div>
+        <!-- Table -->
+        <div *ngIf="accounts.length > 0" class="table-container">
+          <table>
+            <thead>
+            <tr>
+              <th>Account</th>
+              <th>Owner</th>
+              <th>Balance</th>
+              <th>Status</th>
+              <th class="text-right">Quick Actions</th>
+            </tr>
+            </thead>
 
-      <!-- Error banner -->
-      <div *ngIf="error" class="alert alert-error">
-        {{ error }}
-      </div>
+            <tbody>
+            <tr *ngFor="let acc of accounts">
 
-      <!-- Loading state -->
-      <div *ngIf="loading" class="loading">
-        Loading accounts…
-      </div>
+              <td>
+                <div class="account-info">
+                  <span class="acc-number">{{ acc.accountNumber }}</span>
+                  <span class="acc-id">ID: {{ acc.id }}</span>
+                </div>
+              </td>
 
-      <!-- Empty state -->
-      <div *ngIf="!loading && accounts.length === 0" class="empty-state">
-        <p>No accounts yet.</p>
-        <p class="empty-hint">
-          Use the form on the left to create the first one.
-        </p>
-      </div>
+              <td>
+                <div class="owner-info">
+                  <span class="owner-name">{{ acc.ownerName }}</span>
+                  <span class="owner-email">{{ acc.ownerEmail }}</span>
+                </div>
+              </td>
 
-      <!-- Table -->
-      <div *ngIf="accounts.length > 0" class="table-wrapper">
-        <table>
-          <thead>
-          <tr>
-            <th>ID</th>
-            <th>Account #</th>
-            <th>Owner</th>
-            <th>Email</th>
-            <th>Balance</th>
-            <th>Status</th>
-            <th>Actions</th>
-          </tr>
-          </thead>
-
-          <tbody>
-          <tr *ngFor="let acc of accounts">
-            <td>{{ acc.id }}</td>
-
-            <td class="mono">
-              {{ acc.accountNumber }}
-            </td>
-
-            <td>{{ acc.ownerName }}</td>
-
-            <td class="email-cell">
-              {{ acc.ownerEmail }}
-            </td>
-
-            <td>
+              <td>
                 <span
                   class="balance"
                   [class.negative]="acc.balance < 0">
-                  {{ acc.balance | number:'1.2-2' }}
+                  {{ acc.balance | number:'1.2-2' }} <small>{{ acc.currency }}</small>
                 </span>
-              &nbsp;{{ acc.currency }}
-            </td>
+              </td>
 
-            <td>
-                <span
-                  class="status"
-                  [class.status-active]="acc.status === 'ACTIVE'"
-                  [class.status-frozen]="acc.status === 'FROZEN'"
-                  [class.status-closed]="acc.status === 'CLOSED'">
-                  {{ acc.status }}
-                </span>
-            </td>
+              <td>
+                  <span
+                    class="status-badge"
+                    [class.status-active]="acc.status === 'ACTIVE'"
+                    [class.status-frozen]="acc.status === 'FROZEN'"
+                    [class.status-closed]="acc.status === 'CLOSED'">
+                    {{ acc.status }}
+                  </span>
+              </td>
 
-            <td>
-              <div class="btn-row">
-                <button class="btn btn-small btn-outline"
-                        (click)="quickDeposit(acc)">
-                  +100
-                </button>
+              <td class="text-right">
+                <div class="btn-row justify-end">
+                  <button class="btn btn-xs btn-outline" title="Deposit $100" (click)="quickDeposit(acc)">
+                    +100
+                  </button>
 
-                <button class="btn btn-small btn-outline"
-                        (click)="quickWithdraw(acc)">
-                  -50
-                </button>
+                  <button class="btn btn-xs btn-outline" title="Withdraw $50" (click)="quickWithdraw(acc)">
+                    -50
+                  </button>
 
-                <button
-                  class="btn btn-small btn-outline"
-                  *ngIf="acc.status === 'ACTIVE'"
-                  (click)="freeze(acc)">
-                  Freeze
-                </button>
+                  <button
+                    class="btn btn-xs btn-outline"
+                    *ngIf="acc.status === 'ACTIVE'"
+                    (click)="freeze(acc)">
+                    Freeze
+                  </button>
 
-                <button
-                  class="btn btn-small btn-outline"
-                  *ngIf="acc.status === 'FROZEN'"
-                  (click)="unfreeze(acc)">
-                  Unfreeze
-                </button>
+                  <button
+                    class="btn btn-xs btn-outline"
+                    *ngIf="acc.status === 'FROZEN'"
+                    (click)="unfreeze(acc)">
+                    Unfreeze
+                  </button>
 
-                <button
-                  class="btn btn-small btn-danger"
-                  *ngIf="acc.status !== 'CLOSED'"
-                  (click)="close(acc)">
-                  Close
-                </button>
-              </div>
-            </td>
-          </tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
+                  <button
+                    class="btn btn-xs btn-danger"
+                    *ngIf="acc.status !== 'CLOSED'"
+                    (click)="close(acc)">
+                    Close
+                  </button>
+                </div>
+              </td>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
 
-  </div>
+    </div>
+  </main>
 </div>
