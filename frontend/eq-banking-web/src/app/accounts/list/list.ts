@@ -16,6 +16,7 @@ export class ListComponent {
   accounts: Account[] = [];
   loading = false;
   error: string | null = null;
+  isDarkMode = false;
 
   // form model
   ownerName = '';
@@ -28,6 +29,26 @@ export class ListComponent {
     private toast: ToastService
   ) {
     this.loadAccounts();
+    // Check system preference
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (prefersDark) {
+      this.toggleTheme();
+    }
+  }
+
+  get totalBalance(): number {
+    return this.accounts
+      .filter(a => a.status === 'ACTIVE')
+      .reduce((sum, acc) => sum + acc.balance, 0);
+  }
+
+  toggleTheme(): void {
+    this.isDarkMode = !this.isDarkMode;
+    if (this.isDarkMode) {
+      document.body.classList.add('dark-theme');
+    } else {
+      document.body.classList.remove('dark-theme');
+    }
   }
 
   loadAccounts(): void {

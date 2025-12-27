@@ -55,13 +55,25 @@ eq-banking-platform/
 - Spring Data JPA
 - H2 (in‑memory database)
 - Bean Validation (Jakarta Validation)
+- Spring Security (Basic Auth)
 - JUnit 5 & Spring Test
 
 ### Frontend
 - Angular
 - TypeScript
-- SCSS
+- SCSS (Modern CSS Variables, Dark Mode)
 - REST API integration
+
+---
+
+## 🔐 Security
+
+The API is secured using **HTTP Basic Authentication**.
+
+- **Username:** `admin`
+- **Password:** `password`
+
+All frontend requests automatically inject these credentials via the `Authorization` header.
 
 ---
 
@@ -150,7 +162,7 @@ In production builds, Angular can be compiled into Spring Boot’s `static/` dir
 
 ## 📌 Future Enhancements
 
-- Authentication & authorization (JWT / OAuth2)
+- Advanced Authorization (JWT / OAuth2)
 - Persistent database (PostgreSQL)
 - Pagination & filtering
 - CI pipeline (GitHub Actions)
