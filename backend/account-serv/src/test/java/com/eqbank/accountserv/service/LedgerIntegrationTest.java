@@ -54,6 +54,7 @@ class LedgerIntegrationTest {
     @Autowired AccountService accounts;
     @Autowired TransferService transfers;
     @Autowired InterestService interest;
+    @Autowired InterestScheduler interestScheduler;
 
     @BeforeEach
     void resetClock() {
@@ -144,6 +145,41 @@ class LedgerIntegrationTest {
         clock.set(Instant.parse("2026-02-20T10:00:00Z"));
         interest.runMonthlyInterest();
         assertThat(accounts.get(saver, savings.id()).balance()).isEqualByComparingTo("12025.00");
+    }
+
+    @Test
+    void scheduledInterestRunPaysInterestInsideATransaction() {
+        AuthenticatedUser saver = customer();
+        AccountResponse savings = accounts.open(saver,
+                new OpenAccountRequest(AccountType.SAVINGS, CurrencyCode.CAD, null, new BigDecimal("2400.00")));
+
+        clock.set(Instant.parse("2026-02-01T03:00:00Z"));
+        interestScheduler.runMonthlyInterest();
+
+        assertThat(accounts.get(saver, savings.id()).balance()).isEqualByComparingTo("2405.00");
+    }
+
+    @Test
+    void concurrentInterestRunsCreditEachAccountOnlyOnce() throws Exception {
+        AuthenticatedUser saver = customer();
+        AccountResponse savings = accounts.open(saver,
+                new OpenAccountRequest(AccountType.SAVINGS, CurrencyCode.CAD, null, new BigDecimal("1200.00")));
+
+        clock.set(Instant.parse("2026-02-01T03:00:00Z"));
+        List<Callable<InterestRunResponse>> runs = new ArrayList<>();
+        for (int i = 0; i < 6; i++) {
+            runs.add(interest::runMonthlyInterest);
+        }
+        try (ExecutorService pool = Executors.newFixedThreadPool(6)) {
+            for (Future<InterestRunResponse> f : pool.invokeAll(runs)) {
+                f.get();
+            }
+        }
+
+        assertThat(accounts.get(saver, savings.id()).balance()).isEqualByComparingTo("1202.50");
+        assertThat(accounts.transactions(saver, savings.id(),
+                com.eqbank.accountserv.domain.TransactionType.INTEREST, null, null, 0, 10).totalElements())
+                .isEqualTo(1);
     }
 
     @Test

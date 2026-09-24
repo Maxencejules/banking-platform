@@ -8,9 +8,6 @@ import com.eqbank.accountserv.domain.TransactionType;
 import com.eqbank.accountserv.dto.InterestRunResponse;
 import com.eqbank.accountserv.repository.AccountRepository;
 import com.eqbank.accountserv.repository.TransactionRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,7 +28,6 @@ import java.util.Map;
 @Service
 public class InterestService {
 
-    private static final Logger log = LoggerFactory.getLogger(InterestService.class);
     private static final BigDecimal MONTHS_PER_YEAR = BigDecimal.valueOf(12);
     private static final BigDecimal PERCENT = BigDecimal.valueOf(100);
 
@@ -48,12 +44,6 @@ public class InterestService {
         this.clock = clock;
     }
 
-    @Scheduled(cron = "${app.banking.interest-cron:0 0 3 1 * *}", zone = "UTC")
-    public void scheduledRun() {
-        InterestRunResponse result = runMonthlyInterest();
-        log.info("Scheduled interest run credited {} accounts: {}", result.accountsCredited(), result.totalInterest());
-    }
-
     @Transactional
     public InterestRunResponse runMonthlyInterest() {
         Instant now = clock.instant();
@@ -62,12 +52,15 @@ public class InterestService {
         Map<CurrencyCode, BigDecimal> totals = new EnumMap<>(CurrencyCode.class);
         int credited = 0;
 
+        // Ids are visited in ascending order, so concurrent runs acquire row locks in the same order.
         for (Long accountId : accounts.findIdsForInterest(AccountType.SAVINGS, AccountStatus.ACTIVE, monthStart)) {
+            Account account = accounts.findByIdForUpdate(accountId).orElseThrow();
+            // Checked under the row lock: a concurrent run that already paid this account has committed
+            // its entry by the time we get the lock, so the account is never credited twice.
             if (transactions.existsByAccountIdAndTypeAndCreatedAtGreaterThanEqual(
                     accountId, TransactionType.INTEREST, monthStart)) {
                 continue;
             }
-            Account account = accounts.findByIdForUpdate(accountId).orElseThrow();
             BigDecimal interest = monthlyInterest(account.getBalance(), account.getInterestRate());
             if (interest.signum() <= 0 || account.getStatus() != AccountStatus.ACTIVE) {
                 continue;
