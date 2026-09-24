@@ -1,0 +1,337 @@
+<div class="page">
+  <header class="page-header">
+    <div>
+      <h1>Administration</h1>
+      <p>Monitor the bank, manage customer accounts and run monthly interest.</p>
+    </div>
+    <button type="button" class="btn btn-primary" [disabled]="interestRunning()" (click)="confirmInterest.set(true)">
+      <app-icon name="percent" />
+      Run monthly interest
+    </button>
+  </header>
+
+  @if (interestResult(); as result) {
+    <section class="alert alert-success interest-result" aria-labelledby="interest-heading" role="status">
+      <app-icon name="check-circle" />
+      <div class="interest-body">
+        <h2 id="interest-heading">Interest run completed</h2>
+        <p>
+          {{ result.accountsCredited }} {{ result.accountsCredited === 1 ? 'account was' : 'accounts were' }} credited
+          on {{ result.runAt | date: 'medium' }}.
+        </p>
+        @if ((result.totalInterest | keyvalue).length > 0) {
+          <ul>
+            @for (entry of result.totalInterest | keyvalue; track entry.key) {
+              <li><strong>{{ entry.value | currency: entry.key }}</strong> total {{ entry.key }} interest</li>
+            }
+          </ul>
+        }
+      </div>
+      <button type="button" class="icon-btn" aria-label="Dismiss interest result" (click)="interestResult.set(null)">
+        <app-icon name="x" [size]="16" />
+      </button>
+    </section>
+  }
+
+  <section aria-label="Bank statistics">
+    @if (stats(); as stats) {
+      <div class="stats-grid">
+        <div class="card stat-card stat-card-primary">
+          <span class="stat-label">Customers</span>
+          <span class="stat-value">{{ stats.totalCustomers }}</span>
+          <span class="stat-hint">Registered customer profiles</span>
+        </div>
+        <div class="card stat-card">
+          <span class="stat-label">Accounts</span>
+          <span class="stat-value">{{ stats.totalAccounts }}</span>
+          <span class="stat-hint">
+            {{ stats.activeAccounts }} active · {{ stats.frozenAccounts }} frozen · {{ stats.closedAccounts }} closed
+          </span>
+        </div>
+        @for (entry of stats.depositsByCurrency | keyvalue; track entry.key) {
+          <div class="card stat-card">
+            <span class="stat-label">{{ entry.key }} deposits</span>
+            <span class="stat-value">{{ entry.value | currency: entry.key }}</span>
+            <span class="stat-hint">Total balances held in {{ entry.key }}</span>
+          </div>
+        }
+      </div>
+    } @else if (statsError(); as message) {
+      <div class="alert alert-error" role="alert">
+        <app-icon name="alert" />
+        <span>{{ message }}</span>
+        <button type="button" class="btn btn-outline btn-sm" (click)="loadStats()">Retry</button>
+      </div>
+    } @else {
+      <div class="stats-grid" aria-hidden="true">
+        <span class="skeleton stat-skeleton"></span>
+        <span class="skeleton stat-skeleton"></span>
+        <span class="skeleton stat-skeleton"></span>
+      </div>
+    }
+  </section>
+
+  <section class="card">
+    <div class="tabs" role="tablist" aria-label="Admin data">
+      <button
+        type="button"
+        role="tab"
+        id="tab-accounts"
+        aria-controls="panel-accounts"
+        [attr.aria-selected]="tab() === 'accounts'"
+        [attr.tabindex]="tab() === 'accounts' ? 0 : -1"
+        (click)="selectTab('accounts')"
+        (keydown)="onTabKeydown($event)"
+      >
+        Accounts
+      </button>
+      <button
+        type="button"
+        role="tab"
+        id="tab-users"
+        aria-controls="panel-users"
+        [attr.aria-selected]="tab() === 'users'"
+        [attr.tabindex]="tab() === 'users' ? 0 : -1"
+        (click)="selectTab('users')"
+        (keydown)="onTabKeydown($event)"
+      >
+        Users
+      </button>
+    </div>
+
+    <div id="panel-accounts" role="tabpanel" aria-labelledby="tab-accounts" [hidden]="tab() !== 'accounts'">
+      <form class="toolbar" role="search" (ngSubmit)="searchAccounts()" novalidate>
+        <div class="field field-grow">
+          <label class="field-label" for="admin-account-q">Search accounts</label>
+          <input
+            id="admin-account-q"
+            class="control"
+            type="search"
+            name="q"
+            placeholder="Account number, owner name or email"
+            [ngModel]="accountSearch()"
+            (ngModelChange)="accountSearch.set($event)"
+          />
+        </div>
+        <div class="field">
+          <label class="field-label" for="admin-account-status">Status</label>
+          <select
+            id="admin-account-status"
+            class="control"
+            name="status"
+            [ngModel]="accountQuery().status"
+            (ngModelChange)="filterStatus($event)"
+          >
+            <option value="">All statuses</option>
+            @for (status of statuses; track status) {
+              <option [value]="status">{{ statusLabel(status) }}</option>
+            }
+          </select>
+        </div>
+        <div class="btn-row">
+          <button type="submit" class="btn btn-primary">
+            <app-icon name="search" [size]="16" />
+            Search
+          </button>
+          <button type="button" class="btn btn-ghost" [disabled]="!hasAccountFilters() && !accountSearch()" (click)="clearAccountFilters()">
+            Clear
+          </button>
+        </div>
+      </form>
+
+      @let accountState = accounts();
+      @if (accountState.error; as message) {
+        <div class="state" role="alert">
+          <p>{{ message }}</p>
+          <button type="button" class="btn btn-outline btn-sm" (click)="reloadAccounts()">Try again</button>
+        </div>
+      } @else if (accountState.data; as data) {
+        @if (data.content.length === 0) {
+          <div class="state"><p>No accounts match your search.</p></div>
+        } @else {
+          <div class="table-wrap" [class.is-stale]="accountState.loading" [attr.aria-busy]="accountState.loading">
+            <table class="table">
+              <caption class="sr-only">Customer accounts</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Account</th>
+                  <th scope="col" class="hide-sm">Owner</th>
+                  <th scope="col" class="text-right">Balance</th>
+                  <th scope="col">Status</th>
+                  <th scope="col" class="text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (account of data.content; track account.id) {
+                  @let busy = rowBusy() === account.id;
+                  <tr>
+                    <td>
+                      <a class="cell-main" [routerLink]="['/accounts', account.id]">{{ account | accountName }}</a>
+                      <span class="cell-sub mono">{{ account.accountNumber | groupAccount }}</span>
+                      <span class="cell-sub">{{ account.type | accountType }} · {{ account.currency }}</span>
+                    </td>
+                    <td class="hide-sm">
+                      <span class="cell-main">{{ account.ownerName }}</span>
+                      <span class="cell-sub">{{ account.ownerEmail }}</span>
+                    </td>
+                    <td class="amount">{{ account.balance | currency: account.currency }}</td>
+                    <td><app-status-badge [status]="account.status" /></td>
+                    <td class="text-right">
+                      <div class="btn-row row-actions">
+                        <a class="btn btn-ghost btn-sm" [routerLink]="['/accounts', account.id]">
+                          View<span class="sr-only"> account {{ account.accountNumber }}</span>
+                        </a>
+                        @if (account.status === 'ACTIVE') {
+                          <button type="button" class="btn btn-outline btn-sm" [disabled]="busy" (click)="accountAction(account, 'freeze')">
+                            Freeze<span class="sr-only"> account {{ account.accountNumber }}</span>
+                          </button>
+                        } @else if (account.status === 'FROZEN') {
+                          <button type="button" class="btn btn-outline btn-sm" [disabled]="busy" (click)="accountAction(account, 'unfreeze')">
+                            Unfreeze<span class="sr-only"> account {{ account.accountNumber }}</span>
+                          </button>
+                        }
+                        @if (account.status !== 'CLOSED') {
+                          <button type="button" class="btn btn-danger-soft btn-sm" [disabled]="busy" (click)="pendingClose.set(account)">
+                            Close<span class="sr-only"> account {{ account.accountNumber }}</span>
+                          </button>
+                        }
+                      </div>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          <app-pagination
+            label="Account pages"
+            [page]="data.page"
+            [size]="data.size"
+            [totalElements]="data.totalElements"
+            [totalPages]="data.totalPages"
+            [disabled]="accountState.loading"
+            (pageChange)="accountsPage($event)"
+          />
+        }
+      } @else {
+        <div class="state" role="status">
+          <span class="spinner" aria-hidden="true"></span>
+          <span>Loading accounts…</span>
+        </div>
+      }
+    </div>
+
+    <div id="panel-users" role="tabpanel" aria-labelledby="tab-users" [hidden]="tab() !== 'users'">
+      <form class="toolbar" role="search" (ngSubmit)="searchUsers()" novalidate>
+        <div class="field field-grow">
+          <label class="field-label" for="admin-user-q">Search users</label>
+          <input
+            id="admin-user-q"
+            class="control"
+            type="search"
+            name="q"
+            placeholder="Name or email"
+            [ngModel]="userSearch()"
+            (ngModelChange)="userSearch.set($event)"
+          />
+        </div>
+        <div class="btn-row">
+          <button type="submit" class="btn btn-primary">
+            <app-icon name="search" [size]="16" />
+            Search
+          </button>
+          <button type="button" class="btn btn-ghost" [disabled]="!userQuery().q && !userSearch()" (click)="clearUserSearch()">
+            Clear
+          </button>
+        </div>
+      </form>
+
+      @let userState = users();
+      @if (userState.error; as message) {
+        <div class="state" role="alert"><p>{{ message }}</p></div>
+      } @else if (userState.data; as data) {
+        @if (data.content.length === 0) {
+          <div class="state"><p>No users match your search.</p></div>
+        } @else {
+          <div class="table-wrap" [class.is-stale]="userState.loading" [attr.aria-busy]="userState.loading">
+            <table class="table">
+              <caption class="sr-only">Registered users</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Name</th>
+                  <th scope="col" class="hide-sm">Email</th>
+                  <th scope="col">Role</th>
+                  <th scope="col" class="hide-sm">Joined</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (user of data.content; track user.id) {
+                  <tr>
+                    <td>
+                      <span class="cell-main">{{ user.fullName }}</span>
+                      <span class="cell-sub show-sm">{{ user.email }}</span>
+                    </td>
+                    <td class="hide-sm">{{ user.email }}</td>
+                    <td>
+                      <span class="badge badge-plain" [class.badge-admin]="user.role === 'ADMIN'">
+                        {{ user.role === 'ADMIN' ? 'Admin' : 'Customer' }}
+                      </span>
+                    </td>
+                    <td class="hide-sm nowrap">{{ user.createdAt | date: 'mediumDate' }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          <app-pagination
+            label="User pages"
+            [page]="data.page"
+            [size]="data.size"
+            [totalElements]="data.totalElements"
+            [totalPages]="data.totalPages"
+            [disabled]="userState.loading"
+            (pageChange)="usersPage($event)"
+          />
+        }
+      } @else {
+        <div class="state" role="status">
+          <span class="spinner" aria-hidden="true"></span>
+          <span>Loading users…</span>
+        </div>
+      }
+    </div>
+  </section>
+</div>
+
+@if (pendingClose(); as account) {
+  <app-confirm-dialog
+    heading="Close this account?"
+    [message]="'Account ' + account.accountNumber + ' (' + account.ownerName + ') will be closed permanently. Only accounts with a balance of exactly 0.00 can be closed.'"
+    confirmLabel="Close account"
+    [danger]="true"
+    [busy]="rowBusy() === account.id"
+    [confirmDisabled]="account.balance !== 0"
+    (confirmed)="accountAction(account, 'close')"
+    (cancelled)="pendingClose.set(null)"
+  >
+    @if (account.balance !== 0) {
+      <div class="alert alert-warning" role="status">
+        <app-icon name="alert" />
+        <span>
+          The balance is {{ account.balance | currency: account.currency }}. The customer must withdraw or transfer it
+          before the account can be closed.
+        </span>
+      </div>
+    }
+  </app-confirm-dialog>
+}
+
+@if (confirmInterest()) {
+  <app-confirm-dialog
+    heading="Run monthly interest?"
+    message="Interest will be credited to every active savings account at its annual rate for one month. Run this once per month."
+    confirmLabel="Run interest"
+    [busy]="interestRunning()"
+    (confirmed)="runInterest()"
+    (cancelled)="confirmInterest.set(false)"
+  />
+}

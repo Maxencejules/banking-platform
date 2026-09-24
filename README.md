@@ -1,177 +1,202 @@
 # MJ Banking Platform
 
-A full‑stack **digital banking accounts platform** inspired by EQ Bank, built with **Spring Boot** and **Angular**. This project demonstrates modern backend API design, frontend integration, validation, testing, and clean architecture practices aligned with real‑world financial systems.
+A full-stack online banking platform built with **Spring Boot 4 (Java 21)** and **Angular 21**.
+Customers register, open chequing and savings accounts, move money, send transfers and download
+statements. Operations staff get a back-office console to search customers and accounts, freeze
+accounts and run monthly interest.
+
+The goal of the project is to model how a real core-banking service behaves: every balance change
+is recorded in an immutable ledger, money movement is safe under concurrency and client retries,
+and business rules are enforced on the server.
 
 ---
 
-## 🚀 Overview
+## Features
 
-The EQ Banking Platform allows users to:
-- Create bank accounts
-- View all accounts
-- Deposit and withdraw funds
-- Freeze, unfreeze, and close accounts
-- Validate inputs on both frontend and backend
-- Persist data using an in‑memory relational database
+**Customers**
+- Registration and login (JWT bearer tokens, BCrypt passwords, lockout after 5 failed attempts)
+- Open chequing or savings accounts in CAD or USD, with an optional initial deposit
+- Deposits and withdrawals with descriptions; per-account daily withdrawal limit
+- Transfers to any account in the bank, with payee confirmation (masked recipient name) and
+  `Idempotency-Key` protection against double submission
+- Transaction history with type/date filters and pagination
+- CSV statements for any date range (up to one year)
+- Rename, freeze/unfreeze and close accounts (closing requires a zero balance)
 
-The project is intentionally designed to mirror **enterprise banking workflows** and **graduate‑level engineering expectations**.
+**Back office (ADMIN role)**
+- Portfolio stats: customers, accounts by status, deposits per currency
+- Search all accounts (number, owner name, email, status) and all users
+- Act on any customer account (freeze, unfreeze, close, view history)
+- Trigger the monthly savings-interest run (also scheduled for the 1st of each month)
+
+**Engineering**
+- Double-entry style ledger: transfers write two entries sharing one reference, each storing the
+  running balance
+- Pessimistic row locks taken in a consistent order, so concurrent transfers in opposite
+  directions cannot deadlock; DB check constraint forbids negative balances
+- Luhn check digit on 12-digit account numbers to catch typos
+- RFC 7807 `application/problem+json` errors everywhere, including security failures
+- Flyway-managed schema, validated by Hibernate at startup
+- OpenAPI docs and Swagger UI
+- Docker images, docker-compose stack with PostgreSQL, GitHub Actions CI
 
 ---
 
-## 🧱 Architecture
+## Architecture
 
 ```
-eq-banking-platform/
-├── backend/
-│   └── account-serv/        # Spring Boot microservice
-│       ├── domain/          # JPA entities
-│       ├── dto/             # Request/response DTOs
-│       ├── repository/      # JPA repositories
-│       ├── service/         # Business logic
-│       ├── web/             # REST controllers
-│       └── config/          # MVC + SPA forwarding config
-│
-├── frontend/
-│   └── eq-banking-web/      # Angular application
-│       └── src/
-│           ├── accounts/        # Feature module
-│           ├── services/        # API services
-│           └── ui/              # Components & styles
-└── README.md
+banking-platform/
+├── backend/account-serv/            Spring Boot API
+│   └── src/main/java/com/eqbank/accountserv/
+│       ├── domain/                  JPA entities (User, Account, Transaction, ...)
+│       ├── repository/              Spring Data repositories + specifications
+│       ├── service/                 Business logic (ledger, transfers, interest, auth)
+│       ├── security/                JWT issuing/validation, security filter chain
+│       ├── web/                     REST controllers
+│       ├── dto/                     Request/response records
+│       ├── exception/               Domain exceptions + problem-detail mapping
+│       ├── bootstrap/               Demo data seeder (dev)
+│       └── config/                  Typed configuration, OpenAPI, SPA fallback
+│   └── src/main/resources/db/migration/   Flyway migrations
+├── frontend/eq-banking-web/         Angular single-page app
+├── docs/API.md                      API reference
+├── docker-compose.yml               PostgreSQL + API + UI
+└── .github/workflows/ci.yml         CI pipeline
 ```
 
-**Backend:** Spring Boot 4, Java 21, JPA, H2
-
-**Frontend:** Angular, TypeScript, SCSS
+| Layer    | Technology |
+|----------|------------|
+| API      | Java 21, Spring Boot 4, Spring MVC, Spring Security (OAuth2 resource server, HS256 JWT), Bean Validation |
+| Data     | Spring Data JPA / Hibernate 7, Flyway, H2 (dev/test), PostgreSQL (prod) |
+| Docs     | springdoc-openapi (Swagger UI) |
+| Frontend | Angular 21 (standalone components, signals), TypeScript, SCSS |
+| Tests    | JUnit 5, Spring MockMvc, AssertJ, Mockito; Vitest for Angular |
+| Delivery | Docker, docker-compose, nginx, GitHub Actions |
 
 ---
 
-## 🛠 Tech Stack
+## Running locally
 
-### Backend
+### Prerequisites
 - Java 21
-- Spring Boot 4
-- Spring MVC
-- Spring Data JPA
-- H2 (in‑memory database)
-- Bean Validation (Jakarta Validation)
-- Spring Security (Basic Auth)
-- JUnit 5 & Spring Test
+- Node.js 22+ and npm
 
-### Frontend
-- Angular
-- TypeScript
-- SCSS (Modern CSS Variables, Dark Mode)
-- REST API integration
-
----
-
-## 🔐 Security
-
-The API is secured using **HTTP Basic Authentication**.
-
-- **Username:** `admin`
-- **Password:** `password`
-
-All frontend requests automatically inject these credentials via the `Authorization` header.
-
----
-
-## 📡 REST API Endpoints
-
-Base URL:
-```
-http://localhost:8081/api/accounts
-```
-
-| Method | Endpoint | Description |
-|------|--------|-------------|
-| POST | / | Create account |
-| GET | / | Get all accounts |
-| GET | /{id} | Get account by ID |
-| POST | /{id}/deposit | Deposit funds |
-| POST | /{id}/withdraw | Withdraw funds |
-| POST | /{id}/freeze | Freeze account |
-| POST | /{id}/unfreeze | Unfreeze account |
-| POST | /{id}/close | Close account |
-
----
-
-## 🧪 Testing Strategy
-
-This project includes **unit and integration tests** aligned with enterprise standards.
-
-### Implemented Tests
-- `AccountServiceTest` – business logic validation
-- `CreateAccountRequestValidationTest` – DTO validation rules
-
-### Test Coverage Focus
-- Input validation
-- Default account state
-- Persistence correctness
-- API contract behavior
-
----
-
-## ▶️ Running the Project
-
-### Backend
+### Backend (dev profile, in-memory H2 with demo data)
 
 ```bash
 cd backend/account-serv
 ./mvnw spring-boot:run
 ```
 
-Backend runs on:
-```
-http://localhost:8081
-```
+- API: http://localhost:8081/api
+- Swagger UI: http://localhost:8081/swagger-ui.html
+- H2 console: http://localhost:8081/h2-console (JDBC URL `jdbc:h2:mem:mjbank`, user `sa`)
 
 ### Frontend
 
 ```bash
 cd frontend/eq-banking-web
-npm install
-ng serve
+npm ci
+npm start
 ```
 
-Frontend runs on:
+Open http://localhost:4200.
+
+### Demo accounts (dev profile only)
+
+| Role     | Email                | Password       |
+|----------|----------------------|----------------|
+| Admin    | `admin@mjbank.dev`   | `Admin123!`    |
+| Customer | `alex@example.com`   | `Password123!` |
+| Customer | `jordan@example.com` | `Password123!` |
+| Customer | `priya@example.com`  | `Password123!` (has a frozen account) |
+
+The seeder creates about 90 days of history: payroll, rent, groceries, bills, auto-savings
+transfers, transfers between customers and monthly interest.
+
+### Full stack with Docker (PostgreSQL)
+
+```bash
+cp .env.example .env      # set POSTGRES_PASSWORD and a random JWT_SECRET (>= 32 chars)
+docker compose up --build
 ```
-http://localhost:4200
+
+Open http://localhost:8080. nginx serves the UI and proxies `/api` to the backend.
+
+---
+
+## Configuration
+
+The `prod` profile reads everything that is environment-specific or secret from environment
+variables and refuses to start without them.
+
+| Variable | Description |
+|----------|-------------|
+| `SPRING_PROFILES_ACTIVE` | `dev` (default) or `prod` |
+| `DATABASE_URL` | JDBC URL, e.g. `jdbc:postgresql://db:5432/mjbank` |
+| `DATABASE_USERNAME` / `DATABASE_PASSWORD` | Database credentials |
+| `JWT_SECRET` | HMAC signing key, at least 32 bytes |
+| `CORS_ALLOWED_ORIGINS` | Comma-separated browser origins allowed to call the API |
+| `DEMO_DATA_ENABLED` | Seed demo data into an empty database (`false` by default in prod) |
+| `SWAGGER_UI_ENABLED` | Expose Swagger UI and `/v3/api-docs` in prod (`false` by default) |
+
+Product settings live in `application.properties` under `app.banking.*`: daily withdrawal limit
+(default 5,000.00), savings rate (2.50% annually, paid monthly) and maximum open accounts
+per customer (10).
+
+---
+
+## API
+
+See [docs/API.md](docs/API.md) for the complete reference: endpoints, payloads, business rules
+and error codes. Swagger UI shows the same information interactively.
+
+Quick example:
+
+```bash
+TOKEN=$(curl -s -X POST localhost:8081/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"alex@example.com","password":"Password123!"}' | jq -r .accessToken)
+
+curl -s localhost:8081/api/accounts -H "Authorization: Bearer $TOKEN" | jq
 ```
 
 ---
 
-## 🔄 Frontend + Backend Integration
+## Testing
 
-The Angular app consumes the Spring Boot API directly.
+```bash
+cd backend/account-serv && ./mvnw verify          # unit, API and concurrency tests
+cd frontend/eq-banking-web && npx ng test --watch=false
+```
 
-In production builds, Angular can be compiled into Spring Boot’s `static/` directory for a **single‑artifact deployment**.
-
----
-
-## 🧠 Design Decisions
-
-- **DTO‑first API design** to avoid entity leakage
-- **Service‑layer business rules** (not controllers)
-- **Explicit account state transitions** (ACTIVE, FROZEN, CLOSED)
-- **Validation on backend for security**
-- **Angular feature‑module separation**
+Backend tests cover domain rules, authentication and lockout, authorization boundaries between
+customers, validation, daily limits, transfer rules, idempotent replay, CSV output, interest
+calculation across month boundaries, and concurrency. The concurrency tests fire parallel
+withdrawals and opposing transfers and assert that no account is overdrawn and no money is
+created or lost.
 
 ---
 
-## 📌 Future Enhancements
+## Design notes
 
-- Advanced Authorization (JWT / OAuth2)
-- Persistent database (PostgreSQL)
-- Pagination & filtering
-- CI pipeline (GitHub Actions)
-- API documentation (OpenAPI / Swagger)
-- Dockerized deployment
+- **Ledger first.** `LedgerService` is the only code path that changes a balance, and it requires
+  an existing transaction (`Propagation.MANDATORY`), so a balance update is never persisted
+  without its ledger entry.
+- **Locking.** Money movement loads accounts with `SELECT ... FOR UPDATE`. Transfers lock the two
+  accounts in ascending id order to prevent deadlocks, and `@Version` columns add optimistic
+  checks on top.
+- **Idempotency.** A transfer submitted with an `Idempotency-Key` is stored with a hash of its
+  payload. A retry returns the original receipt. Reusing a key with a different payload returns
+  `409`.
+- **Time.** All business time is UTC and comes from an injectable `Clock`, which keeps daily
+  limits and interest runs testable.
+- **Errors.** Domain exceptions map to 404/409/422/423, and all error bodies are RFC 7807
+  problem documents with field-level `errors` for validation failures.
 
 ---
 
-## 👤 Author
+## Author
 
 **Maxence Jules**  
 B.Sc. Computer Science Student  
@@ -179,9 +204,6 @@ Aspiring Software Engineer
 
 GitHub: https://github.com/Maxencejules
 
----
+## License
 
-## 📄 License
-
-This project is provided for educational and portfolio purposes.
-
+Provided for educational and portfolio purposes.

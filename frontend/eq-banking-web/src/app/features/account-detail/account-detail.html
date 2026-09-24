@@ -1,0 +1,238 @@
+<div class="page">
+  <a class="back-link" [routerLink]="backLink()">
+    <app-icon name="arrow-left" [size]="16" />
+    {{ backLink() === '/admin' ? 'Back to admin' : 'Back to dashboard' }}
+  </a>
+
+  @if (account(); as account) {
+    <section class="card account-hero" aria-labelledby="account-heading">
+      <div class="hero-main">
+        <div class="hero-title">
+          <span class="account-kind">{{ account.type | accountType }} · {{ account.currency }}</span>
+          <div class="row">
+            <h1 id="account-heading">{{ name() }}</h1>
+            @if (!isClosed()) {
+              <button type="button" class="icon-btn" aria-label="Rename account" title="Rename" (click)="openDialog('rename')">
+                <app-icon name="pencil" [size]="16" />
+              </button>
+            }
+            <app-status-badge [status]="account.status" />
+          </div>
+          <div class="row account-number">
+            <span class="mono">{{ account.accountNumber | groupAccount }}</span>
+            <button
+              type="button"
+              class="icon-btn"
+              aria-label="Copy account number"
+              title="Copy account number"
+              (click)="copyNumber(account.accountNumber)"
+            >
+              <app-icon name="copy" [size]="16" />
+            </button>
+          </div>
+        </div>
+
+        <div class="hero-balance">
+          <span class="stat-label">Balance</span>
+          <span class="balance tnum">{{ account.balance | currency: account.currency }}</span>
+        </div>
+      </div>
+
+      @if (account.status === 'FROZEN') {
+        <div class="alert alert-info" role="status">
+          <app-icon name="snowflake" />
+          <span>This account is frozen. Deposits, withdrawals and transfers are blocked until it is unfrozen.</span>
+        </div>
+      } @else if (account.status === 'CLOSED') {
+        <div class="alert alert-warning" role="status">
+          <app-icon name="archive" />
+          <span>
+            This account was closed{{ account.closedAt ? ' on ' + (account.closedAt | date: 'mediumDate') : '' }}.
+            Its history and statements remain available.
+          </span>
+        </div>
+      }
+
+      <div class="hero-actions btn-row">
+        <button type="button" class="btn btn-primary" [disabled]="!isActive()" (click)="openDialog('deposit')">
+          <app-icon name="deposit" />
+          Deposit
+        </button>
+        <button type="button" class="btn btn-outline" [disabled]="!isActive()" (click)="openDialog('withdraw')">
+          <app-icon name="withdraw" />
+          Withdraw
+        </button>
+        @if (isActive() && isOwner()) {
+          <a class="btn btn-outline" routerLink="/transfer" [queryParams]="{ from: account.id }">
+            <app-icon name="transfer" />
+            Transfer
+          </a>
+        }
+        <span class="spacer"></span>
+        @if (account.status === 'ACTIVE') {
+          <button type="button" class="btn btn-ghost" [disabled]="actionBusy()" (click)="openDialog('freeze')">
+            <app-icon name="snowflake" />
+            Freeze
+          </button>
+        } @else if (account.status === 'FROZEN') {
+          <button type="button" class="btn btn-ghost" [disabled]="actionBusy()" (click)="unfreeze()">
+            <app-icon name="unlock" />
+            Unfreeze
+          </button>
+        }
+        @if (!isClosed()) {
+          <button type="button" class="btn btn-danger-soft" [disabled]="actionBusy()" (click)="openDialog('close')">
+            <app-icon name="archive" />
+            Close account
+          </button>
+        }
+      </div>
+    </section>
+
+    <div class="detail-grid">
+      <section class="card" aria-labelledby="details-heading">
+        <div class="card-header">
+          <h2 id="details-heading">Account details</h2>
+        </div>
+        <div class="card-body">
+          <dl class="details">
+            <dt>Account number</dt>
+            <dd class="mono">{{ account.accountNumber }}</dd>
+            <dt>Type</dt>
+            <dd>{{ account.type | accountType }}</dd>
+            <dt>Currency</dt>
+            <dd>{{ account.currency }}</dd>
+            <dt>Interest rate</dt>
+            <dd>
+              {{ account.interestRate | number: '1.2-2' }}% annual
+              @if (account.type === 'SAVINGS') {
+                <span class="muted small">(credited monthly)</span>
+              }
+            </dd>
+            <dt>Opened</dt>
+            <dd>{{ account.createdAt | date: 'mediumDate' }}</dd>
+            @if (!isOwner()) {
+              <dt>Owner</dt>
+              <dd>
+                {{ account.ownerName }}
+                <span class="cell-sub muted">{{ account.ownerEmail }}</span>
+              </dd>
+            }
+          </dl>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="limit-heading">
+        <div class="card-header">
+          <h2 id="limit-heading">Daily withdrawal limit</h2>
+        </div>
+        <div class="card-body stack">
+          <div class="limit-figures">
+            <span class="tnum"><strong>{{ account.withdrawnToday | currency: account.currency }}</strong> used today</span>
+            <span class="muted tnum">of {{ account.dailyWithdrawalLimit | currency: account.currency }}</span>
+          </div>
+          <div
+            class="progress"
+            [class.is-warning]="limit().percent >= 75 && limit().percent < 100"
+            [class.is-danger]="limit().percent >= 100"
+            role="progressbar"
+            aria-label="Daily withdrawal limit used"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            [attr.aria-valuenow]="limit().percent"
+            [attr.aria-valuetext]="limit().percent + '% used'"
+          >
+            <div class="progress-bar" [style.width.%]="limit().percent"></div>
+          </div>
+          <p class="muted small">
+            {{ limit().remaining | currency: account.currency }} left today. Withdrawals and outgoing transfers
+            count toward the limit, which resets at midnight UTC.
+          </p>
+        </div>
+      </section>
+
+      <app-statement-card [accountId]="account.id" [accountNumber]="account.accountNumber" />
+    </div>
+
+    <app-transaction-history [accountId]="account.id" [currency]="account.currency" [version]="historyVersion()" />
+
+    @switch (dialog()) {
+      @case ('deposit') {
+        <app-money-dialog
+          mode="deposit"
+          [account]="account"
+          (completed)="onMoneyCompleted('deposit', $event, account)"
+          (closed)="closeDialog()"
+        />
+      }
+      @case ('withdraw') {
+        <app-money-dialog
+          mode="withdraw"
+          [account]="account"
+          (completed)="onMoneyCompleted('withdraw', $event, account)"
+          (closed)="closeDialog()"
+        />
+      }
+      @case ('rename') {
+        <app-rename-dialog [account]="account" (renamed)="onRenamed($event)" (closed)="closeDialog()" />
+      }
+      @case ('freeze') {
+        <app-confirm-dialog
+          heading="Freeze this account?"
+          message="While frozen, no deposits, withdrawals or transfers can be made. You can unfreeze it at any time."
+          confirmLabel="Freeze account"
+          [busy]="actionBusy()"
+          (confirmed)="freeze()"
+          (cancelled)="closeDialog()"
+        />
+      }
+      @case ('close') {
+        <app-confirm-dialog
+          heading="Close this account?"
+          message="Closing is permanent and cannot be undone. An account can only be closed when its balance is exactly 0.00."
+          confirmLabel="Close account"
+          [danger]="true"
+          [busy]="actionBusy()"
+          [confirmDisabled]="account.balance !== 0"
+          (confirmed)="closeAccount()"
+          (cancelled)="closeDialog()"
+        >
+          @if (account.balance !== 0) {
+            <div class="alert alert-warning" role="status">
+              <app-icon name="alert" />
+              <span>
+                This account still holds {{ account.balance | currency: account.currency }}. Withdraw or transfer
+                the remaining balance first.
+              </span>
+            </div>
+          } @else {
+            <div class="alert alert-success" role="status">
+              <app-icon name="check-circle" />
+              <span>The balance is 0.00, so this account can be closed.</span>
+            </div>
+          }
+        </app-confirm-dialog>
+      }
+    }
+  } @else if (loading()) {
+    <div class="state" role="status">
+      <span class="spinner" aria-hidden="true"></span>
+      <span>Loading account…</span>
+    </div>
+  } @else if (loadError(); as message) {
+    <div class="card state" role="alert">
+      <app-icon [name]="notFound() ? 'compass' : 'alert'" [size]="36" />
+      <h3>{{ notFound() ? 'Account not found' : 'Something went wrong' }}</h3>
+      <p>{{ message }}</p>
+      <div class="btn-row">
+        @if (!notFound()) {
+          <button type="button" class="btn btn-primary" (click)="reload()">
+            <app-icon name="refresh" />
+            Try again
+          </button>
+        }
+        <a class="btn btn-outline" [routerLink]="backLink()">Go back</a>
+      </div>
+    </div>
+  }
+</div>

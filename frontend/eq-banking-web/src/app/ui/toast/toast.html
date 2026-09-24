@@ -1,8 +1,0 @@
-<div class="toast-container" *ngIf="toast$ | async as toast">
-  <div class="toast" [ngClass]="'toast-' + toast.type">
-    <div class="toast-message">
-      {{ toast.message }}
-    </div>
-    <button class="toast-close" (click)="dismiss()">✕</button>
-  </div>
-</div>

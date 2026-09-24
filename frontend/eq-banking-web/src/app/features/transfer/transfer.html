@@ -1,0 +1,297 @@
+<div class="page page-narrow">
+  <header class="page-header">
+    <div>
+      <h1>Transfer money</h1>
+      <p>Send money between your accounts or to another MJ Banking customer.</p>
+    </div>
+  </header>
+
+  <ol class="steps" aria-label="Transfer progress">
+    <li [class.current]="step() === 'details'" [class.complete]="step() !== 'details'" [attr.aria-current]="step() === 'details' ? 'step' : null">
+      <span class="step-dot" aria-hidden="true">1</span> Details
+    </li>
+    <li [class.current]="step() === 'review'" [class.complete]="step() === 'done'" [attr.aria-current]="step() === 'review' ? 'step' : null">
+      <span class="step-dot" aria-hidden="true">2</span> Review
+    </li>
+    <li [class.current]="step() === 'done'" [attr.aria-current]="step() === 'done' ? 'step' : null">
+      <span class="step-dot" aria-hidden="true">3</span> Done
+    </li>
+  </ol>
+
+  @if (loading()) {
+    <div class="card state" role="status">
+      <span class="spinner" aria-hidden="true"></span>
+      <span>Loading your accounts…</span>
+    </div>
+  } @else if (loadError(); as message) {
+    <div class="card state" role="alert">
+      <app-icon name="alert" [size]="32" />
+      <p>{{ message }}</p>
+      <button type="button" class="btn btn-primary" (click)="loadAccounts()">Try again</button>
+    </div>
+  } @else if (sourceAccounts().length === 0) {
+    <div class="card state">
+      <app-icon name="wallet" [size]="36" />
+      <h3>No active accounts</h3>
+      <p>You need an active account to send money. Frozen and closed accounts cannot send transfers.</p>
+      <a class="btn btn-primary" routerLink="/dashboard">Go to dashboard</a>
+    </div>
+  } @else {
+    @switch (step()) {
+      @case ('details') {
+        <form class="card card-body form-grid" [formGroup]="form" (ngSubmit)="continueToReview()" novalidate>
+          <h2 class="section-title" tabindex="-1" #stepHeading>Transfer details</h2>
+
+          @let fromError = fieldError('fromAccountId', 'From account');
+          <div class="field">
+            <label class="field-label" for="transfer-from">From account</label>
+            <select
+              id="transfer-from"
+              class="control"
+              formControlName="fromAccountId"
+              [attr.aria-invalid]="!!fromError"
+              [attr.aria-describedby]="fromError ? 'transfer-from-error' : 'transfer-from-hint'"
+            >
+              <option [ngValue]="null" disabled>Choose an account…</option>
+              @for (account of sourceAccounts(); track account.id) {
+                <option [ngValue]="account.id">
+                  {{ accountLabel(account) }} — {{ account.balance | currency: account.currency }}
+                </option>
+              }
+            </select>
+            @if (fromError) {
+              <p class="field-error" id="transfer-from-error">{{ fromError }}</p>
+            } @else if (fromAccount(); as from) {
+              <p class="field-hint" id="transfer-from-hint">
+                Available {{ from.balance | currency: from.currency }} ·
+                Daily limit left {{ (from.dailyWithdrawalLimit - from.withdrawnToday) | currency: from.currency }}
+              </p>
+            } @else {
+              <p class="field-hint" id="transfer-from-hint">Only active accounts can send money.</p>
+            }
+          </div>
+
+          @let toError = fieldError('toAccountNumber', 'Recipient account number');
+          <div class="field">
+            <label class="field-label" for="transfer-to">To account number</label>
+            <div class="lookup-row">
+              <input
+                id="transfer-to"
+                class="control mono"
+                type="text"
+                inputmode="numeric"
+                autocomplete="off"
+                maxlength="20"
+                placeholder="12-digit account number"
+                formControlName="toAccountNumber"
+                (keydown.enter)="$event.preventDefault(); lookupRecipient()"
+                [attr.aria-invalid]="!!toError || !!recipientError()"
+                [attr.aria-describedby]="'transfer-to-status'"
+              />
+              <button
+                type="button"
+                class="btn btn-outline"
+                [disabled]="recipientLoading()"
+                (click)="lookupRecipient()"
+              >
+                @if (recipientLoading()) {
+                  <span class="btn-spinner" aria-hidden="true"></span>
+                } @else {
+                  <app-icon name="search" [size]="16" />
+                }
+                Verify
+              </button>
+            </div>
+            <div id="transfer-to-status" aria-live="polite">
+              @if (toError) {
+                <p class="field-error">{{ toError }}</p>
+              } @else if (recipientError(); as message) {
+                <p class="field-error">{{ message }}</p>
+              } @else if (recipient(); as r) {
+                <div class="recipient" [class.is-mismatch]="currencyMismatch()">
+                  <app-icon [name]="currencyMismatch() ? 'alert' : 'check-circle'" />
+                  <div>
+                    <strong>{{ r.displayName }}</strong>
+                    <span class="muted small"> · {{ r.accountNumber | maskAccount }} · {{ r.currency }}</span>
+                    @if (currencyMismatch()) {
+                      <p class="small">
+                        This account holds {{ r.currency }}. Transfers must be in the same currency as the source
+                        account ({{ fromAccount()?.currency }}).
+                      </p>
+                    }
+                  </div>
+                </div>
+              } @else {
+                <p class="field-hint">We'll show the recipient's name so you can check it before sending.</p>
+              }
+            </div>
+          </div>
+
+          @if (ownDestinations().length > 0) {
+            <div class="field">
+              <label class="field-label" for="transfer-own">Or pick one of your accounts</label>
+              <select
+                id="transfer-own"
+                class="control"
+                [value]="selectedOwnDestination()"
+                (change)="chooseOwnDestination($any($event.target).value)"
+              >
+                <option value="">Choose one of your accounts…</option>
+                @for (account of ownDestinations(); track account.id) {
+                  <option [value]="account.accountNumber">
+                    {{ accountLabel(account) }} — {{ account.currency }}
+                  </option>
+                }
+              </select>
+            </div>
+          }
+
+          @let amountError = fieldError('amount', 'Amount');
+          <div class="field">
+            <label class="field-label" for="transfer-amount">Amount</label>
+            <div class="input-affix">
+              <span class="affix" aria-hidden="true">{{ fromAccount()?.currency ?? 'CAD' }}</span>
+              <input
+                id="transfer-amount"
+                class="control tnum"
+                type="number"
+                inputmode="decimal"
+                min="0.01"
+                step="0.01"
+                placeholder="0.00"
+                formControlName="amount"
+                [attr.aria-invalid]="!!amountError"
+                [attr.aria-describedby]="amountError ? 'transfer-amount-error' : null"
+              />
+            </div>
+            @if (amountError) {
+              <p class="field-error" id="transfer-amount-error">{{ amountError }}</p>
+            }
+          </div>
+
+          @let descriptionError = fieldError('description', 'Description');
+          <div class="field">
+            <label class="field-label" for="transfer-description">
+              Description <span class="optional">(optional)</span>
+            </label>
+            <input
+              id="transfer-description"
+              class="control"
+              type="text"
+              placeholder="e.g. Rent share"
+              formControlName="description"
+              [attr.maxlength]="descriptionMax"
+              [attr.aria-invalid]="!!descriptionError"
+              [attr.aria-describedby]="descriptionError ? 'transfer-description-error' : null"
+            />
+            @if (descriptionError) {
+              <p class="field-error" id="transfer-description-error">{{ descriptionError }}</p>
+            }
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary" [disabled]="recipientLoading()">
+              Review transfer
+              <app-icon name="arrow-right" [size]="16" />
+            </button>
+          </div>
+        </form>
+      }
+
+      @case ('review') {
+        @if (review(); as r) {
+          <section class="card card-body stack" aria-labelledby="review-heading">
+            <h2 class="section-title" id="review-heading" tabindex="-1" #stepHeading>Review your transfer</h2>
+
+            <div class="review-amount">
+              <span class="muted small">You're sending</span>
+              <strong class="tnum">{{ r.amount | currency: r.from.currency }}</strong>
+            </div>
+
+            <dl class="details">
+              <dt>From</dt>
+              <dd>
+                {{ r.from | accountName }}
+                <span class="cell-sub muted">{{ r.from.accountNumber | maskAccount }}</span>
+              </dd>
+              <dt>To</dt>
+              <dd>
+                {{ r.recipient.displayName }}
+                <span class="cell-sub muted mono">{{ r.recipient.accountNumber | groupAccount }} · {{ r.recipient.currency }}</span>
+              </dd>
+              @if (r.description) {
+                <dt>Description</dt>
+                <dd>{{ r.description }}</dd>
+              }
+              <dt>Balance after</dt>
+              <dd class="tnum">{{ r.balanceAfter | currency: r.from.currency }}</dd>
+            </dl>
+
+            @if (transferError(); as message) {
+              <div class="alert alert-error" role="alert">
+                <app-icon name="alert" />
+                <div>
+                  <p>{{ message }}</p>
+                  <p class="small">You can safely try again — the transfer will not be sent twice.</p>
+                </div>
+              </div>
+            }
+
+            <div class="form-actions">
+              <button type="button" class="btn btn-outline" [disabled]="sending()" (click)="backToDetails()">
+                <app-icon name="arrow-left" [size]="16" />
+                Edit
+              </button>
+              <button type="button" class="btn btn-primary" [disabled]="sending()" (click)="confirm()">
+                @if (sending()) {
+                  <span class="btn-spinner" aria-hidden="true"></span>
+                  Sending…
+                } @else {
+                  {{ transferError() ? 'Try again' : 'Confirm transfer' }}
+                }
+              </button>
+            </div>
+          </section>
+        }
+      }
+
+      @case ('done') {
+        @if (receipt(); as receipt) {
+          <section class="card card-body stack receipt" aria-labelledby="receipt-heading">
+            <div class="receipt-icon" aria-hidden="true"><app-icon name="check" [size]="28" /></div>
+            <h2 class="section-title" id="receipt-heading" tabindex="-1" #stepHeading>Transfer complete</h2>
+            <p class="receipt-amount tnum">{{ receipt.amount | currency: receipt.currency }}</p>
+
+            <dl class="details">
+              <dt>Reference</dt>
+              <dd class="mono">{{ receipt.reference }}</dd>
+              <dt>From</dt>
+              <dd>
+                {{ receipt.fromAccount | accountName }}
+                <span class="cell-sub muted">{{ receipt.fromAccount.accountNumber | maskAccount }}</span>
+              </dd>
+              <dt>To</dt>
+              <dd>
+                {{ review()?.recipient?.displayName ?? 'Recipient' }}
+                <span class="cell-sub muted">{{ receipt.toAccountNumber | maskAccount }}</span>
+              </dd>
+              @if (receipt.description) {
+                <dt>Description</dt>
+                <dd>{{ receipt.description }}</dd>
+              }
+              <dt>Date</dt>
+              <dd>{{ receipt.createdAt | date: 'medium' }}</dd>
+              <dt>New balance</dt>
+              <dd class="tnum">{{ receipt.fromAccount.balance | currency: receipt.fromAccount.currency }}</dd>
+            </dl>
+
+            <div class="form-actions">
+              <a class="btn btn-outline" [routerLink]="['/accounts', receipt.fromAccount.id]">View account</a>
+              <button type="button" class="btn btn-primary" (click)="startOver()">Make another transfer</button>
+            </div>
+          </section>
+        }
+      }
+    }
+  }
+</div>

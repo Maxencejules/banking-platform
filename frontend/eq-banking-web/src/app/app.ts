@@ -1,17 +1,20 @@
-import { Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
-import { ToastComponent } from './ui/toast/toast';
+import { ThemeService } from './core/ui/theme.service';
+import { ToastsComponent } from './shared/toasts';
 
 @Component({
   selector: 'app-root',
-  standalone: true,
-  imports: [RouterOutlet, ToastComponent],
-  templateUrl: './app.html',
-  styleUrl: './app.scss'
+  imports: [RouterOutlet, ToastsComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `
+    <router-outlet />
+    <app-toasts />
+  `,
 })
-export class AppComponent {
-  title = 'eq-banking-web';
+export class App {
+  constructor() {
+    // Instantiate early so the saved / preferred theme applies on every page, including sign-in.
+    inject(ThemeService);
+  }
 }
-
-// 👇 add this line at the end of the file
-export { AppComponent as App };

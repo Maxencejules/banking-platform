@@ -31,3 +31,6 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Angular build copied in for single-artifact packaging ###
+src/main/resources/static/

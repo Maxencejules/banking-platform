@@ -1,0 +1,70 @@
+.account-hero {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.hero-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.hero-title {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+
+  h1 { font-size: clamp(1.35rem, 3vw, 1.75rem); font-weight: 700; overflow-wrap: anywhere; }
+  .row { gap: 0.5rem; }
+}
+
+.account-kind {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+}
+
+.account-number { color: var(--color-text-muted); gap: 0.25rem; }
+
+.hero-balance {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+
+  .stat-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-text-muted);
+  }
+
+  .balance { font-size: clamp(1.75rem, 5vw, 2.4rem); font-weight: 800; letter-spacing: -0.02em; }
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+
+.limit-figures {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+}
+
+@media (max-width: 560px) {
+  .hero-balance { align-items: flex-start; }
+  .hero-actions .spacer { display: none; }
+  .account-hero { padding: 1.25rem 1rem; }
+}
