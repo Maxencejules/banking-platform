@@ -1,0 +1,113 @@
+.stat-skeleton { height: 6.5rem; border-radius: var(--radius-lg); }
+
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.account-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
+  gap: 1rem;
+}
+
+.account-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.25rem;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+
+  &:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+  &.is-closed { opacity: 0.7; }
+}
+
+.account-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.account-title {
+  min-width: 0;
+
+  h3 { font-size: 1.05rem; font-weight: 600; overflow-wrap: anywhere; }
+  a { color: var(--color-text-main); }
+  a:hover { color: var(--color-primary); }
+}
+
+.account-kind {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+}
+
+.account-number {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  margin: -0.5rem 0 -0.25rem;
+}
+
+.account-balance { font-size: 1.6rem; font-weight: 700; overflow-wrap: anywhere; }
+
+.account-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: auto;
+}
+
+.activity-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+
+  li {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    padding: 0.8rem 1.5rem;
+    border-bottom: 1px solid var(--color-divider);
+
+    &:last-child { border-bottom: none; }
+  }
+}
+
+.activity-icon {
+  display: grid;
+  place-items: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--color-danger-bg);
+  color: var(--color-danger-text);
+
+  &.is-credit { background: var(--color-success-bg); color: var(--color-success-text); }
+}
+
+.activity-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-wrap: anywhere;
+}
+
+.activity-amount { font-weight: 600; white-space: nowrap; }
+
+@media (max-width: 420px) {
+  .activity-list li { padding-inline: 1rem; }
+}

@@ -1,0 +1,195 @@
+<div class="page">
+  <header class="page-header">
+    <div>
+      <h1>{{ greeting() }}</h1>
+      <p>Here's an overview of your money today.</p>
+    </div>
+    <div class="btn-row">
+      <a class="btn btn-outline" routerLink="/transfer">
+        <app-icon name="transfer" />
+        Transfer
+      </a>
+      <button
+        type="button"
+        class="btn btn-primary"
+        [disabled]="loading() || !canOpenMore()"
+        [attr.title]="canOpenMore() ? null : 'You can hold at most ' + maxOpenAccounts + ' open accounts'"
+        (click)="dialogOpen.set(true)"
+      >
+        <app-icon name="plus" />
+        Open account
+      </button>
+    </div>
+  </header>
+
+  @if (loading()) {
+    <div class="stats-grid" aria-hidden="true">
+      <span class="skeleton stat-skeleton"></span>
+      <span class="skeleton stat-skeleton"></span>
+      <span class="skeleton stat-skeleton"></span>
+    </div>
+    <div class="state" role="status">
+      <span class="spinner" aria-hidden="true"></span>
+      <span>Loading your accounts…</span>
+    </div>
+  } @else if (loadError(); as message) {
+    <div class="card state" role="alert">
+      <app-icon name="alert" [size]="32" />
+      <h3>Something went wrong</h3>
+      <p>{{ message }}</p>
+      <button type="button" class="btn btn-primary" (click)="load()">
+        <app-icon name="refresh" />
+        Try again
+      </button>
+    </div>
+  } @else {
+    <section class="stats-grid" aria-label="Balances">
+      @for (total of totals(); track total.currency; let first = $first) {
+        <div class="card stat-card" [class.stat-card-primary]="first">
+          <span class="stat-label">Total {{ total.currency }} balance</span>
+          <span class="stat-value">{{ total.total | currency: total.currency }}</span>
+          <span class="stat-hint">
+            Across {{ total.count }} {{ total.count === 1 ? 'account' : 'accounts' }}
+          </span>
+        </div>
+      }
+      <div class="card stat-card">
+        <span class="stat-label">Open accounts</span>
+        <span class="stat-value">{{ openAccounts().length }} <small class="muted">/ {{ maxOpenAccounts }}</small></span>
+        <span class="stat-hint">
+          @if (canOpenMore()) {
+            You can open {{ maxOpenAccounts - openAccounts().length }} more
+          } @else {
+            Account limit reached
+          }
+        </span>
+      </div>
+    </section>
+
+    <section class="stack" aria-labelledby="accounts-heading">
+      <div class="section-head">
+        <h2 id="accounts-heading" class="section-title">Your accounts</h2>
+        @if (closedCount() > 0) {
+          <label class="checkbox">
+            <input type="checkbox" [checked]="showClosed()" (change)="showClosed.set(!showClosed())" />
+            Show closed ({{ closedCount() }})
+          </label>
+        }
+      </div>
+
+      @if (visibleAccounts().length === 0) {
+        <div class="card state">
+          <app-icon name="wallet" [size]="36" />
+          <h3>No open accounts yet</h3>
+          <p>Open a chequing or savings account in CAD or USD to get started.</p>
+          <button type="button" class="btn btn-primary" [disabled]="!canOpenMore()" (click)="dialogOpen.set(true)">
+            <app-icon name="plus" />
+            Open your first account
+          </button>
+        </div>
+      } @else {
+        <ul class="account-grid" role="list">
+          @for (account of visibleAccounts(); track account.id) {
+            @let revealed = isRevealed(account.id);
+            @let name = account | accountName;
+            <li class="card account-card" [class.is-closed]="account.status === 'CLOSED'">
+              <div class="account-card-top">
+                <div class="account-title">
+                  <span class="account-kind">{{ account.type | accountType }} · {{ account.currency }}</span>
+                  <h3>
+                    <a [routerLink]="['/accounts', account.id]">{{ name }}</a>
+                  </h3>
+                </div>
+                <app-status-badge [status]="account.status" />
+              </div>
+
+              <div class="account-number">
+                @if (revealed) {
+                  <span class="mono">{{ account.accountNumber | groupAccount }}</span>
+                } @else {
+                  <span class="mono" aria-hidden="true">{{ account.accountNumber | maskAccount }}</span>
+                  <span class="sr-only">Account ending in {{ account.accountNumber.slice(-4) }}</span>
+                }
+                <button
+                  type="button"
+                  class="icon-btn"
+                  [attr.aria-pressed]="revealed"
+                  [attr.aria-label]="(revealed ? 'Hide' : 'Show') + ' full account number for ' + name"
+                  (click)="toggleReveal(account.id)"
+                >
+                  <app-icon [name]="revealed ? 'eye-off' : 'eye'" [size]="16" />
+                </button>
+              </div>
+
+              <div>
+                <p class="account-balance tnum">{{ account.balance | currency: account.currency }}</p>
+                <p class="muted small">
+                  @if (account.type === 'SAVINGS') {
+                    Earning {{ account.interestRate }}% annual interest
+                  } @else {
+                    Available balance
+                  }
+                </p>
+              </div>
+
+              <div class="account-card-actions">
+                <a class="btn btn-outline btn-sm" [routerLink]="['/accounts', account.id]">
+                  View details<span class="sr-only"> for {{ name }}</span>
+                </a>
+                @if (account.status === 'ACTIVE') {
+                  <a class="btn btn-ghost btn-sm" routerLink="/transfer" [queryParams]="{ from: account.id }">
+                    <app-icon name="transfer" [size]="16" />
+                    Transfer<span class="sr-only"> from {{ name }}</span>
+                  </a>
+                }
+              </div>
+            </li>
+          }
+        </ul>
+      }
+    </section>
+
+    @if (openAccounts().length > 0) {
+      <section class="card" aria-labelledby="activity-heading">
+        <div class="card-header">
+          <h2 id="activity-heading">Recent activity</h2>
+        </div>
+        @if (activityLoading()) {
+          <div class="state" role="status">
+            <span class="spinner" aria-hidden="true"></span>
+            <span>Loading recent activity…</span>
+          </div>
+        } @else if (activity().length === 0) {
+          <div class="state">
+            <p>No transactions yet. Deposits and transfers will show up here.</p>
+          </div>
+        } @else {
+          <ul class="activity-list" role="list">
+            @for (item of activity(); track item.account.id + ":" + item.tx.id) {
+              <li>
+                <span class="activity-icon" [class.is-credit]="item.signed > 0" aria-hidden="true">
+                  <app-icon [name]="item.signed > 0 ? 'deposit' : 'withdraw'" [size]="16" />
+                </span>
+                <div class="activity-main">
+                  <span class="cell-main">{{ item.tx.description || (item.tx.type | txType) }}</span>
+                  <span class="muted small">
+                    {{ item.tx.type | txType }} ·
+                    <a [routerLink]="['/accounts', item.account.id]">{{ item.account | accountName }}</a>
+                    · <time [attr.datetime]="item.tx.createdAt">{{ item.tx.createdAt | date: 'MMM d, h:mm a' }}</time>
+                  </span>
+                </div>
+                <span class="activity-amount tnum" [class.credit]="item.signed > 0" [class.debit]="item.signed < 0">
+                  {{ item.signed > 0 ? '+' : '−' }}{{ item.tx.amount | currency: item.account.currency }}
+                </span>
+              </li>
+            }
+          </ul>
+        }
+      </section>
+    }
+  }
+</div>
+
+@if (dialogOpen()) {
+  <app-open-account-dialog (created)="onCreated($event)" (closed)="dialogOpen.set(false)" />
+}

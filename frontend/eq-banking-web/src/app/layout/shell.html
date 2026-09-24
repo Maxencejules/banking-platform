@@ -1,0 +1,81 @@
+<a class="skip-link" href="#main-content">Skip to main content</a>
+
+<header class="app-header">
+  <div class="header-inner">
+    <a class="brand" routerLink="/" aria-label="MJ Banking home">
+      <span class="brand-mark" aria-hidden="true">MJ</span>
+      <span class="brand-name">MJ Banking</span>
+    </a>
+
+    <nav class="main-nav" aria-label="Main">
+      <a routerLink="/dashboard" routerLinkActive="active" ariaCurrentWhenActive="page">
+        <app-icon name="grid" [size]="16" />
+        <span>Dashboard</span>
+      </a>
+      <a routerLink="/transfer" routerLinkActive="active" ariaCurrentWhenActive="page">
+        <app-icon name="transfer" [size]="16" />
+        <span>Transfer</span>
+      </a>
+      @if (auth.isAdmin()) {
+        <a routerLink="/admin" routerLinkActive="active" ariaCurrentWhenActive="page">
+          <app-icon name="shield" [size]="16" />
+          <span>Admin</span>
+        </a>
+      }
+    </nav>
+
+    <div class="header-actions">
+      <button
+        type="button"
+        class="icon-btn"
+        [attr.aria-label]="theme.isDark() ? 'Switch to light mode' : 'Switch to dark mode'"
+        [attr.title]="theme.isDark() ? 'Switch to light mode' : 'Switch to dark mode'"
+        (click)="theme.toggle()"
+      >
+        <app-icon [name]="theme.isDark() ? 'sun' : 'moon'" />
+      </button>
+
+      @if (auth.user(); as user) {
+        <div class="user-menu" #menuRoot>
+          <button
+            #menuTrigger
+            type="button"
+            class="user-trigger"
+            aria-controls="user-menu-panel"
+            [attr.aria-expanded]="menuOpen()"
+            (click)="toggleMenu()"
+          >
+            <span class="avatar" aria-hidden="true">{{ userInitials() }}</span>
+            <span class="user-name">{{ firstName() }}</span>
+            <span class="sr-only">Account menu for {{ user.fullName }}</span>
+            <app-icon name="chevron-down" [size]="16" />
+          </button>
+
+          @if (menuOpen()) {
+            <div id="user-menu-panel" class="user-menu-panel">
+              <div class="user-summary">
+                <strong>{{ user.fullName }}</strong>
+                <span class="muted small">{{ user.email }}</span>
+                @if (auth.isAdmin()) {
+                  <span class="badge badge-admin badge-plain">Administrator</span>
+                }
+              </div>
+              <button type="button" class="menu-item" (click)="logout()">
+                <app-icon name="log-out" [size]="16" />
+                Sign out
+              </button>
+            </div>
+          }
+        </div>
+      }
+    </div>
+  </div>
+</header>
+
+<main id="main-content" tabindex="-1">
+  <router-outlet />
+</main>
+
+<footer class="app-footer">
+  <p>© {{ year }} MJ Banking · Portfolio demo — not a real financial institution.</p>
+</footer>

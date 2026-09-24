@@ -1,4 +1,5 @@
 export const environment = {
   production: true,
-  apiBaseUrl: 'http://localhost:8081/api'
+  /** The production bundle is served behind an nginx reverse proxy that forwards /api. */
+  apiBaseUrl: '/api',
 };

@@ -1,0 +1,145 @@
+<section class="card" aria-labelledby="history-heading">
+  <div class="card-header">
+    <h2 id="history-heading">Transaction history</h2>
+    <div class="row small">
+      <label for="history-size" class="muted">Rows</label>
+      <select
+        id="history-size"
+        class="control page-size"
+        [ngModel]="size()"
+        (ngModelChange)="changeSize(+$event)"
+      >
+        @for (option of pageSizes; track option) {
+          <option [ngValue]="option">{{ option }}</option>
+        }
+      </select>
+    </div>
+  </div>
+
+  <form class="toolbar" (ngSubmit)="applyFilters()" novalidate aria-label="Filter transactions">
+    <div class="field">
+      <label class="field-label" for="history-type">Type</label>
+      <select
+        id="history-type"
+        class="control"
+        name="type"
+        [ngModel]="draft().type"
+        (ngModelChange)="updateDraft({ type: $event })"
+      >
+        <option value="">All types</option>
+        @for (type of types; track type) {
+          <option [value]="type">{{ typeLabel(type) }}</option>
+        }
+      </select>
+    </div>
+    <div class="field">
+      <label class="field-label" for="history-from">From</label>
+      <input
+        id="history-from"
+        class="control"
+        type="date"
+        name="from"
+        [max]="draft().to"
+        [ngModel]="draft().from"
+        (ngModelChange)="updateDraft({ from: $event ?? '' })"
+        [attr.aria-invalid]="!!filterError()"
+        [attr.aria-describedby]="filterError() ? 'history-filter-error' : null"
+      />
+    </div>
+    <div class="field">
+      <label class="field-label" for="history-to">To</label>
+      <input
+        id="history-to"
+        class="control"
+        type="date"
+        name="to"
+        [min]="draft().from"
+        [ngModel]="draft().to"
+        (ngModelChange)="updateDraft({ to: $event ?? '' })"
+        [attr.aria-invalid]="!!filterError()"
+        [attr.aria-describedby]="filterError() ? 'history-filter-error' : null"
+      />
+    </div>
+    <div class="btn-row">
+      <button type="submit" class="btn btn-primary">Apply</button>
+      <button type="button" class="btn btn-ghost" [disabled]="!hasFilters()" (click)="resetFilters()">Reset</button>
+    </div>
+    @if (filterError(); as message) {
+      <p class="field-error" id="history-filter-error" role="alert">{{ message }}</p>
+    }
+  </form>
+
+  @if (loadError(); as message) {
+    <div class="state" role="alert">
+      <p>{{ message }}</p>
+      <button type="button" class="btn btn-outline btn-sm" (click)="retry()">
+        <app-icon name="refresh" [size]="16" />
+        Try again
+      </button>
+    </div>
+  } @else if (result(); as result) {
+    @if (result.content.length === 0) {
+      <div class="state" [attr.aria-busy]="loading()">
+        <app-icon name="file" [size]="32" />
+        <h3>No transactions found</h3>
+        <p>{{ hasFilters() ? 'Try adjusting or resetting the filters.' : 'Transactions will appear here once money moves.' }}</p>
+      </div>
+    } @else {
+      <div class="table-wrap" [class.is-stale]="loading()" [attr.aria-busy]="loading()">
+        <table class="table">
+          <caption class="sr-only">Transactions, newest first</caption>
+          <thead>
+            <tr>
+              <th scope="col">Date</th>
+              <th scope="col">Description</th>
+              <th scope="col" class="hide-sm">Type</th>
+              <th scope="col" class="text-right">Amount</th>
+              <th scope="col" class="text-right hide-sm">Balance</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (tx of result.content; track tx.id) {
+              @let credit = isCredit(tx.type);
+              <tr>
+                <td class="nowrap">
+                  <time [attr.datetime]="tx.createdAt">{{ tx.createdAt | date: 'mediumDate' }}</time>
+                  <span class="cell-sub">{{ tx.createdAt | date: 'shortTime' }}</span>
+                </td>
+                <td>
+                  <span class="cell-main">{{ tx.description || (tx.type | txType) }}</span>
+                  <span class="cell-sub">
+                    <span class="mono">{{ tx.reference }}</span>
+                    @if (tx.counterpartyAccountNumber) {
+                      · {{ tx.type === 'TRANSFER_IN' ? 'From' : 'To' }} {{ tx.counterpartyAccountNumber | maskAccount }}
+                    }
+                  </span>
+                </td>
+                <td class="hide-sm">
+                  <span class="badge badge-plain">{{ tx.type | txType }}</span>
+                </td>
+                <td class="amount" [class.credit]="credit" [class.debit]="!credit">
+                  <span class="sr-only">{{ credit ? 'Credit' : 'Debit' }} </span>{{ credit ? '+' : '−' }}{{ tx.amount | currency: currency() }}
+                </td>
+                <td class="amount hide-sm muted">{{ tx.balanceAfter | currency: currency() }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <app-pagination
+        label="Transaction pages"
+        [page]="result.page"
+        [size]="result.size"
+        [totalElements]="result.totalElements"
+        [totalPages]="result.totalPages"
+        [disabled]="loading()"
+        (pageChange)="pageIndex.set($event)"
+      />
+    }
+  } @else {
+    <div class="state" role="status">
+      <span class="spinner" aria-hidden="true"></span>
+      <span>Loading transactions…</span>
+    </div>
+  }
+</section>

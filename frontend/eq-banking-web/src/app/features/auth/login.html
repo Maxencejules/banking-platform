@@ -1,0 +1,96 @@
+<app-auth-layout heading="Sign in" subheading="Welcome back. Sign in to manage your accounts.">
+  @if (notice(); as message) {
+    <div class="alert alert-info" role="status">
+      <app-icon name="info" />
+      <span>{{ message }}</span>
+    </div>
+  }
+
+  <form class="auth-form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+    @if (serverError(); as message) {
+      <div class="alert alert-error" role="alert">
+        <app-icon name="alert" />
+        <span>{{ message }}</span>
+      </div>
+    }
+
+    @let emailError = fieldError('email', 'Email');
+    <div class="field">
+      <label class="field-label" for="login-email">Email</label>
+      <input
+        id="login-email"
+        class="control"
+        type="email"
+        formControlName="email"
+        autocomplete="username"
+        inputmode="email"
+        [attr.maxlength]="emailMax"
+        [attr.aria-invalid]="!!emailError"
+        [attr.aria-describedby]="emailError ? 'login-email-error' : null"
+      />
+      @if (emailError) {
+        <p class="field-error" id="login-email-error">{{ emailError }}</p>
+      }
+    </div>
+
+    @let passwordError = fieldError('password', 'Password');
+    <div class="field">
+      <label class="field-label" for="login-password">Password</label>
+      <div class="password-wrap">
+        <input
+          id="login-password"
+          class="control"
+          [type]="showPassword() ? 'text' : 'password'"
+          formControlName="password"
+          autocomplete="current-password"
+          [attr.aria-invalid]="!!passwordError"
+          [attr.aria-describedby]="passwordError ? 'login-password-error' : null"
+        />
+        <button
+          type="button"
+          class="icon-btn"
+          [attr.aria-label]="showPassword() ? 'Hide password' : 'Show password'"
+          [attr.aria-pressed]="showPassword()"
+          (click)="showPassword.set(!showPassword())"
+        >
+          <app-icon [name]="showPassword() ? 'eye-off' : 'eye'" />
+        </button>
+      </div>
+      @if (passwordError) {
+        <p class="field-error" id="login-password-error">{{ passwordError }}</p>
+      }
+    </div>
+
+    <button type="submit" class="btn btn-primary btn-block" [disabled]="submitting()">
+      @if (submitting()) {
+        <span class="btn-spinner" aria-hidden="true"></span>
+        Signing in…
+      } @else {
+        Sign in
+      }
+    </button>
+  </form>
+
+  <p class="auth-switch">
+    New to MJ Banking? <a routerLink="/register">Open an account</a>
+  </p>
+
+  <section class="demo" aria-labelledby="demo-heading">
+    <h2 id="demo-heading">Demo credentials</h2>
+    <p class="muted small">Available when the backend runs with the dev profile.</p>
+    <ul>
+      @for (demo of demoCredentials; track demo.email) {
+        <li>
+          <span class="demo-role">{{ demo.role }}</span>
+          <span class="demo-creds">
+            <span class="mono">{{ demo.email }}</span>
+            <span class="mono subtle">{{ demo.password }}</span>
+          </span>
+          <button type="button" class="btn btn-outline btn-sm" (click)="useDemo(demo)">
+            Use<span class="sr-only"> {{ demo.role }} {{ demo.email }}</span>
+          </button>
+        </li>
+      }
+    </ul>
+  </section>
+</app-auth-layout>

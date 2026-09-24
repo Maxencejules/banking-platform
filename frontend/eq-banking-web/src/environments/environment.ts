@@ -1,4 +1,5 @@
 export const environment = {
   production: false,
-  apiBaseUrl: 'http://localhost:8081/api'
+  /** Local Spring Boot backend (see docs/API.md). */
+  apiBaseUrl: 'http://localhost:8081/api',
 };

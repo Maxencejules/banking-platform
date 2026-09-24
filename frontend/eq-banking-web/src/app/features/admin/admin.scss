@@ -1,0 +1,21 @@
+.stat-skeleton { height: 6.5rem; border-radius: var(--radius-lg); }
+
+.interest-result {
+  align-items: flex-start;
+
+  .interest-body { flex: 1; }
+  h2 { font-size: 1rem; font-weight: 600; margin-bottom: 0.25rem; }
+  .icon-btn { color: inherit; }
+}
+
+.row-actions {
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+}
+
+.show-sm { display: none; }
+
+@media (max-width: 640px) {
+  .show-sm { display: block; }
+  .row-actions { flex-wrap: wrap; min-width: 6.5rem; }
+}
