@@ -1,83 +1,119 @@
 package com.eqbank.accountserv.web;
 
-import com.eqbank.accountserv.domain.Account;
-import com.eqbank.accountserv.dto.CreateAccountRequest;
-import com.eqbank.accountserv.dto.AmountRequest;
+import com.eqbank.accountserv.domain.TransactionType;
+import com.eqbank.accountserv.dto.AccountResponse;
+import com.eqbank.accountserv.dto.MoneyMovementRequest;
+import com.eqbank.accountserv.dto.OpenAccountRequest;
+import com.eqbank.accountserv.dto.PageResponse;
+import com.eqbank.accountserv.dto.TransactionResponse;
+import com.eqbank.accountserv.dto.UpdateAccountRequest;
+import com.eqbank.accountserv.security.CurrentUser;
 import com.eqbank.accountserv.service.AccountService;
+import com.eqbank.accountserv.service.StatementService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
-@CrossOrigin(origins = "http://localhost:4200")
+@Tag(name = "Accounts")
 @RestController
 @RequestMapping("/api/accounts")
 public class AccountController {
 
-    private final AccountService service;
+    private static final MediaType TEXT_CSV = new MediaType("text", "csv", java.nio.charset.StandardCharsets.UTF_8);
 
-    public AccountController(AccountService service) {
-        this.service = service;
+    private final AccountService accounts;
+    private final StatementService statements;
+    private final CurrentUser currentUser;
+
+    public AccountController(AccountService accounts, StatementService statements, CurrentUser currentUser) {
+        this.accounts = accounts;
+        this.statements = statements;
+        this.currentUser = currentUser;
     }
 
-    @PostMapping
-    public ResponseEntity<Account> createAccount(
-            @Valid @RequestBody CreateAccountRequest request
-    ) {
-        Account created = service.createAccount(
-                request.getOwnerName(),
-                request.getOwnerEmail(),
-                request.getInitialBalance(),
-                request.getCurrency()
-        );
-
-        return ResponseEntity.status(HttpStatus.CREATED).body(created);
-    }
-
+    @Operation(summary = "List the caller's accounts")
     @GetMapping
-    public List<Account> getAll() {
-        return service.getAllAccounts();
+    public List<AccountResponse> list() {
+        return accounts.listOwn(currentUser.get());
+    }
+
+    @Operation(summary = "Open a new account")
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    public AccountResponse open(@Valid @RequestBody OpenAccountRequest request) {
+        return accounts.open(currentUser.get(), request);
     }
 
     @GetMapping("/{id}")
-    public Account getOne(@PathVariable Long id) {
-        return service.getById(id);
+    public AccountResponse get(@PathVariable Long id) {
+        return accounts.get(currentUser.get(), id);
+    }
+
+    @Operation(summary = "Rename an account")
+    @PatchMapping("/{id}")
+    public AccountResponse update(@PathVariable Long id, @Valid @RequestBody UpdateAccountRequest request) {
+        return accounts.rename(currentUser.get(), id, request.nickname());
     }
 
     @PostMapping("/{id}/deposit")
-    public ResponseEntity<Account> deposit(
-            @PathVariable Long id,
-            @Valid @RequestBody AmountRequest request
-    ) {
-        Account updated = service.deposit(id, request.getAmount());
-        return ResponseEntity.ok(updated);
+    public AccountResponse deposit(@PathVariable Long id, @Valid @RequestBody MoneyMovementRequest request) {
+        return accounts.deposit(currentUser.get(), id, request);
     }
 
     @PostMapping("/{id}/withdraw")
-    public ResponseEntity<Account> withdraw(
-            @PathVariable Long id,
-            @Valid @RequestBody AmountRequest request
-    ) {
-        Account updated = service.withdraw(id, request.getAmount());
-        return ResponseEntity.ok(updated);
+    public AccountResponse withdraw(@PathVariable Long id, @Valid @RequestBody MoneyMovementRequest request) {
+        return accounts.withdraw(currentUser.get(), id, request);
     }
 
     @PostMapping("/{id}/freeze")
-    public ResponseEntity<Account> freeze(@PathVariable Long id) {
-        return ResponseEntity.ok(service.freezeAccount(id));
-    }
-
-    @PostMapping("/{id}/close")
-    public ResponseEntity<Account> close(@PathVariable Long id) {
-        return ResponseEntity.ok(service.closeAccount(id));
+    public AccountResponse freeze(@PathVariable Long id) {
+        return accounts.freeze(currentUser.get(), id);
     }
 
     @PostMapping("/{id}/unfreeze")
-    public ResponseEntity<Account> unfreeze(@PathVariable Long id) {
-        return ResponseEntity.ok(service.unfreezeAccount(id));
+    public AccountResponse unfreeze(@PathVariable Long id) {
+        return accounts.unfreeze(currentUser.get(), id);
     }
 
+    @Operation(summary = "Close an account (balance must be zero; irreversible)")
+    @PostMapping("/{id}/close")
+    public AccountResponse close(@PathVariable Long id) {
+        return accounts.close(currentUser.get(), id);
+    }
 
+    @Operation(summary = "Transaction history, newest first")
+    @GetMapping("/{id}/transactions")
+    public PageResponse<TransactionResponse> transactions(
+            @PathVariable Long id,
+            @RequestParam(required = false) TransactionType type,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return accounts.transactions(currentUser.get(), id, type, from, to, page, size);
+    }
+
+    @Operation(summary = "Download a CSV statement for a date range")
+    @GetMapping(value = "/{id}/statement", produces = "text/csv")
+    public ResponseEntity<String> statement(
+            @PathVariable Long id,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        String csv = statements.csv(currentUser.get(), id, from, to);
+        String filename = "statement-" + id + "-" + from + "-to-" + to + ".csv";
+        return ResponseEntity.ok()
+                .contentType(TEXT_CSV)
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(filename).build().toString())
+                .body(csv);
+    }
 }
