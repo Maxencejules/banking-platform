@@ -68,6 +68,33 @@ class TransferApiTest extends IntegrationTestSupport {
     }
 
     @Test
+    void replayKeepsTransferDetailsButReturnsTheCurrentSourceAccountView() throws Exception {
+        String token = registerCustomer("Replay Customer");
+        OpenedAccount from = openAccount(token, "CHECKING", "CAD", "100");
+        OpenedAccount to = openAccount(token, "SAVINGS", "CAD", null);
+        String payload = json("{\"fromAccountId\":%d,\"toAccountNumber\":\"%s\",\"amount\":40,\"description\":\"Rent share\"}",
+                from.id(), to.number());
+        String reference = read(mvc.perform(authed(post("/api/transfers"), token)
+                        .header("Idempotency-Key", "live-account-view").contentType(MediaType.APPLICATION_JSON).content(payload))
+                .andExpect(status().isCreated()).andReturn(), "$.reference");
+        mvc.perform(authed(post("/api/accounts/" + from.id() + "/deposit"), token)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"amount\":10}"))
+                .andExpect(status().isOk());
+        mvc.perform(authed(post("/api/transfers"), token).header("Idempotency-Key", "live-account-view")
+                        .contentType(MediaType.APPLICATION_JSON).content(payload.replace("\"amount\":40", "\"amount\":40.00")))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.reference").value(reference))
+                .andExpect(jsonPath("$.amount").value(40.00))
+                .andExpect(jsonPath("$.description").value("Rent share"))
+                .andExpect(jsonPath("$.toAccountNumber").value(to.number()))
+                .andExpect(jsonPath("$.fromAccount.balance").value(70.00));
+        mvc.perform(authed(get("/api/accounts/" + to.id()), token)).andExpect(jsonPath("$.balance").value(40.00));
+        mvc.perform(authed(get("/api/accounts/" + from.id() + "/transactions?type=TRANSFER_OUT"), token))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].balanceAfter").value(60.00));
+    }
+
+    @Test
     void transferRules() throws Exception {
         String alex = registerCustomer("Alex Martin");
         String jordan = registerCustomer("Jordan Lee");
