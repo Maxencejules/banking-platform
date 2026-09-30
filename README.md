@@ -196,7 +196,11 @@ withdrawals and opposing transfers and assert that no account is overdrawn and n
 created or lost.
 
 The default backend suite uses H2 for quick local checks. H2's PostgreSQL compatibility mode
-does not establish PostgreSQL locking behavior. To run the entire suite plus the PostgreSQL-only
+does not establish PostgreSQL locking behavior. H2 is explicitly set to 2.5.250 to fix the
+[cross-connection CHECK regression](https://github.com/h2database/h2database/issues/4308)
+in 2.4.240, as listed in the [upstream release notes](https://github.com/h2database/h2database/releases/tag/version-2.5.250).
+The upgrade fixtures keep separate JDBC connections to exercise that behavior.
+To run the entire suite plus the PostgreSQL-only
 API regressions, create a dedicated empty test database and supply its connection settings:
 
 ```bash
