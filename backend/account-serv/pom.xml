@@ -16,6 +16,8 @@
     <properties>
         <java.version>21</java.version>
         <springdoc.version>3.0.0</springdoc.version>
+        <!-- Fix H2's cross-connection CHECK regression (#4302), present in managed 2.4.240. -->
+        <h2.version>2.5.250</h2.version>
     </properties>
     <dependencies>
         <dependency>

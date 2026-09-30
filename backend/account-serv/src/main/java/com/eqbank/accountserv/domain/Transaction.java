@@ -10,7 +10,8 @@ import java.time.Instant;
  * a transfer produces two entries (one per account) sharing the same reference.
  */
 @Entity
-@Table(name = "transactions")
+@Table(name = "transactions", uniqueConstraints = @UniqueConstraint(name = "uk_transactions_reference_type",
+        columnNames = {"reference", "type"}))
 public class Transaction {
 
     @Id
@@ -21,7 +22,7 @@ public class Transaction {
     @JoinColumn(name = "account_id", nullable = false, updatable = false)
     private Account account;
 
-    @Column(nullable = false, length = 20, updatable = false)
+    @Column(nullable = false, length = 40, updatable = false)
     private String reference;
 
     @Enumerated(EnumType.STRING)

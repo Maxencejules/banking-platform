@@ -32,8 +32,8 @@ and business rules are enforced on the server.
 **Engineering**
 - Double-entry style ledger: transfers write two entries sharing one reference, each storing the
   running balance
-- Pessimistic row locks taken in a consistent order, so concurrent transfers in opposite
-  directions cannot deadlock; DB check constraint forbids negative balances
+- Pessimistic account row locks taken in ascending id order; DB check constraint forbids
+  negative balances
 - Luhn check digit on 12-digit account numbers to catch typos
 - RFC 7807 `application/problem+json` errors everywhere, including security failures
 - Flyway-managed schema, validated by Hibernate at startup
@@ -57,7 +57,8 @@ banking-platform/
 │       ├── exception/               Domain exceptions + problem-detail mapping
 │       ├── bootstrap/               Demo data seeder (dev)
 │       └── config/                  Typed configuration, OpenAPI, SPA fallback
-│   └── src/main/resources/db/migration/   Flyway migrations
+│   ├── src/main/java/db/migration/       Java Flyway upgrade guard
+│   └── src/main/resources/db/migration/   SQL Flyway migrations
 ├── frontend/eq-banking-web/         Angular single-page app
 ├── docs/API.md                      API reference
 ├── docker-compose.yml               PostgreSQL + API + UI
@@ -70,7 +71,7 @@ banking-platform/
 | Data     | Spring Data JPA / Hibernate 7, Flyway, H2 (dev/test), PostgreSQL (prod) |
 | Docs     | springdoc-openapi (Swagger UI) |
 | Frontend | Angular 21 (standalone components, signals), TypeScript, SCSS |
-| Tests    | JUnit 5, Spring MockMvc, AssertJ, Mockito; Vitest for Angular |
+| Tests    | JUnit 5, Spring MockMvc, AssertJ, Mockito; real PostgreSQL concurrency tests; Vitest for Angular |
 | Delivery | Docker, docker-compose, nginx, GitHub Actions |
 
 ---
@@ -122,6 +123,24 @@ docker compose up --build
 ```
 
 Open http://localhost:8080. nginx serves the UI and proxies `/api` to the backend.
+
+### Repeatable customer and administrator demo
+
+With the dev API running and its demo administrator seeded, run from the repository root:
+
+```bash
+python scripts/demo_api.py
+# For the Docker stack:
+python scripts/demo_api.py --base-url http://127.0.0.1:8080/api
+```
+
+Python 3.10+ and its standard library are enough. The script creates two fresh customers and
+accounts on each run, submits four parallel retries of one CAD 25 transfer, checks a payload
+conflict and both ledger legs, verifies CAD 75/25 balances, and exercises admin freeze/unfreeze
+and customer authorization boundaries. It prints a JSON result and exits unsuccessfully when
+an assertion fails. Use a disposable local demo database; the script intentionally adds data.
+An existing database needs the demo administrator (or provide `--admin-email` and
+`--admin-password`). CI runs the same script against a fresh PostgreSQL database.
 
 ---
 
@@ -176,6 +195,33 @@ calculation across month boundaries, and concurrency. The concurrency tests fire
 withdrawals and opposing transfers and assert that no account is overdrawn and no money is
 created or lost.
 
+The default backend suite uses H2 for quick local checks. H2's PostgreSQL compatibility mode
+does not establish PostgreSQL locking behavior. H2 is explicitly set to 2.5.250 to fix the
+[cross-connection CHECK regression](https://github.com/h2database/h2database/issues/4308)
+in 2.4.240, as listed in the [upstream release notes](https://github.com/h2database/h2database/releases/tag/version-2.5.250).
+The upgrade fixtures keep separate JDBC connections to exercise that behavior.
+To run the entire suite plus the PostgreSQL-only
+API regressions, create a dedicated empty test database and supply its connection settings:
+
+```bash
+cd backend/account-serv
+export SPRING_DATASOURCE_URL=jdbc:postgresql://127.0.0.1:5432/banking_test
+export SPRING_DATASOURCE_USERNAME=bank_test
+export SPRING_DATASOURCE_PASSWORD=bank_test
+export BANKING_POSTGRES_TESTS=true
+./mvnw verify
+```
+
+The PostgreSQL regressions refuse to run on H2. They hold an account lock until
+`pg_stat_activity` confirms that every parallel API request is waiting on a database row lock,
+then verify same-key replay, conflicting payloads, opposite-direction keyed transfers, rollback
+after rejection, exactly two ledger legs per transfer, and each account's running ledger
+balance. Upgrade fixtures migrate actual V1 data, preserve valid legacy receipts and keys,
+and reject ambiguous references before changing ledger rows or column widths. They run on
+H2 and in the PostgreSQL jobs. CI runs these checks and the API demo on PostgreSQL 16 and 17
+(the Docker stack uses 17); the frontend job covers customer retry/receipt behavior and
+administrator action success/failure states.
+
 ---
 
 ## Design notes
@@ -183,16 +229,47 @@ created or lost.
 - **Ledger first.** `LedgerService` is the only code path that changes a balance, and it requires
   an existing transaction (`Propagation.MANDATORY`), so a balance update is never persisted
   without its ledger entry.
-- **Locking.** Money movement loads accounts with `SELECT ... FOR UPDATE`. Transfers lock the two
-  accounts in ascending id order to prevent deadlocks, and `@Version` columns add optimistic
-  checks on top.
+- **Locking.** Money movement row-locks accounts. Transfers lock the two accounts in ascending
+  id order; the locking query does not also lock their owners. `@Version` columns add optimistic
+  checks on top. Keyed transfers first lock the caller's user row, so other keyed transfers by
+  that caller wait before checking the key. This works across API instances sharing one database.
 - **Idempotency.** A transfer submitted with an `Idempotency-Key` is stored with a hash of its
-  payload. A retry returns the original receipt. Reusing a key with a different payload returns
-  `409`.
+  payload in the same transaction as both ledger legs. A retry returns the original transfer
+  reference and details with the current `fromAccount` view. Reusing a key with a different
+  payload returns `409`. Transfer transactions explicitly use `READ_COMMITTED`, so a key lookup
+  after waiting sees the preceding commit. Failed transfers roll back the key and all money
+  movement; a later funded retry can succeed.
+- **References and upgrades.** New ledger references retain the complete random UUID.
+  The database rejects duplicate `(reference, type)` legs, and replay only reads an outgoing
+  receipt owned by the caller. V2 widens reference columns without rewriting V1 or old receipts.
+  Its preflight permits one deposit, withdrawal or interest leg, or one outgoing/incoming pair
+  with equal amount and currency on different accounts. Ambiguous or unpaired old references
+  stop startup with the conflicting reference;
+  reconcile the existing history explicitly before retrying. The migration never deletes or
+  renumbers ledger rows. Stop all money-writing app instances, including old versions, before
+  applying schema upgrades.
 - **Time.** All business time is UTC and comes from an injectable `Clock`, which keeps daily
   limits and interest runs testable.
 - **Errors.** Domain exceptions map to 404/409/422/423, and all error bodies are RFC 7807
   problem documents with field-level `errors` for validation failures.
+
+---
+
+## Scope and limits
+
+This is a portfolio banking simulation, with customer/admin authorization and transactional
+money movement. Deposits and initial funding are simulated, with no external settlement or
+bank integrations. Transfers have balanced debit/credit legs; this is not a complete general
+ledger. Ledger fields are append-only through the application, not protected from direct
+database administrator changes.
+
+Idempotency applies to transfers only, requires a header, is scoped to the authenticated user,
+and retains successful keys without expiry. Amount scale is normalized (`40` and `40.00` replay
+the same transfer); description text remains part of the payload hash. Different keys for one
+user are deliberately serialized as a simple correctness tradeoff. The UI keeps an attempt's
+key during retries on the review screen; a reload or a newly edited attempt creates a new key.
+The tests demonstrate bounded concurrent behavior on one database, not failover, load capacity,
+or a production security/compliance review.
 
 ---
 

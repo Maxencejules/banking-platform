@@ -131,6 +131,35 @@ describe('TransferComponent', () => {
     expect(el.textContent).toContain('Jordan L.');
   });
 
+  it('suppresses confirmation in flight and retries the frozen review after a lost response', async () => {
+    await fillAndReview();
+    component['confirm']();
+    const first = expectTransfer();
+    const key = first.request.headers.get(IDEMPOTENCY_HEADER);
+    const payload = first.request.body;
+    component['confirm']();
+    component['backToDetails']();
+    http.expectNone(`${TEST_API}/transfers`);
+    expect(component['step']()).toBe('review');
+    // The server may have committed even when its response never reached the browser.
+    first.error(new ProgressEvent('error'), { status: 0, statusText: 'Network error' });
+    await fixture.whenStable();
+    component['form'].patchValue({ amount: 123, description: 'Unconfirmed edit' });
+    component['confirm']();
+    const retry = expectTransfer();
+    expect(retry.request.headers.get(IDEMPOTENCY_HEADER)).toBe(key);
+    expect(retry.request.body).toEqual(payload);
+    retry.flush({
+      reference: 'TX-REPLAY', fromAccount: { ...source, balance: 800 },
+      toAccountNumber: '100000000025', amount: 200, currency: 'CAD',
+      description: 'Rent share', createdAt: '2026-09-24T14:03:11.123Z',
+    }, { status: 201, statusText: 'Created' });
+    await fixture.whenStable();
+    expect(component['step']()).toBe('done');
+    expect(el.textContent).toContain('TX-REPLAY');
+    expect(component['accounts']().find((account) => account.id === 3)?.balance).toBe(800);
+  });
+
   it('blocks sending to a different currency', async () => {
     component['form'].patchValue({ toAccountNumber: '100000000025', amount: 10 });
     component['continueToReview']();
