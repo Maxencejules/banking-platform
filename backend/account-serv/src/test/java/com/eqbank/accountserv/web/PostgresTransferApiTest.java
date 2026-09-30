@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MvcResult;
@@ -24,6 +25,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -158,6 +160,65 @@ class PostgresTransferApiTest extends IntegrationTestSupport {
         assertOneTransferPair(read(success, "$.reference"), from, to, new BigDecimal("40"));
         assertBalancesAndLedger(from, to, "70", "40");
         assertThat(keyCount(from, key)).isEqualTo(1);
+    }
+
+    @Test
+    void duplicateTransferLegIsRejectedAndReplayStillReturnsTheOwnedReceipt() throws Exception {
+        String token = registerCustomer("Unique Ledger Customer");
+        OpenedAccount from = openAccount(token, "CHECKING", "CAD", "100");
+        OpenedAccount to = openAccount(token, "SAVINGS", "CAD", null);
+        PendingTransfer request = new PendingTransfer(token, body(from, to, "40"), UUID.randomUUID().toString());
+        MvcResult first = send(request);
+        assertThat(first.getResponse().getStatus()).isEqualTo(201);
+        String reference = read(first, "$.reference");
+
+        assertThatThrownBy(() -> jdbc.update("""
+                insert into transactions (account_id, reference, type, amount, balance_after,
+                    description, counterparty_account_number, created_at)
+                select account_id, reference, type, amount, balance_after,
+                    description, counterparty_account_number, created_at
+                from transactions where reference = ? and type = 'TRANSFER_OUT'
+                """, reference)).isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("uk_transactions_reference_type");
+
+        MvcResult replay = send(request);
+        assertThat(replay.getResponse().getStatus()).isEqualTo(201);
+        assertThat((String) read(replay, "$.reference")).isEqualTo(reference);
+        assertThat(((Number) read(replay, "$.fromAccount.id")).longValue()).isEqualTo(from.id());
+        assertOneTransferPair(reference, from, to, new BigDecimal("40"));
+        assertBalancesAndLedger(from, to, "60", "40");
+    }
+
+    @Test
+    void aCorruptedKeyCannotReplayAnotherCustomersReceipt() throws Exception {
+        String alice = registerCustomer("Alice Receipt");
+        String bob = registerCustomer("Bob Receipt");
+        OpenedAccount a = openAccount(alice, "CHECKING", "CAD", "100");
+        OpenedAccount aTo = openAccount(alice, "SAVINGS", "CAD", null);
+        OpenedAccount b = openAccount(bob, "CHECKING", "CAD", "100");
+        OpenedAccount bTo = openAccount(bob, "SAVINGS", "CAD", null);
+        PendingTransfer requestA = new PendingTransfer(alice, body(a, aTo, "40"), UUID.randomUUID().toString());
+        PendingTransfer requestB = new PendingTransfer(bob, body(b, bTo, "25"), UUID.randomUUID().toString());
+        String referenceA = read(send(requestA), "$.reference");
+        String referenceB = read(send(requestB), "$.reference");
+        String updateKey = """
+                update idempotency_keys set transfer_reference = ?
+                where idempotency_key = ? and user_id = (select owner_id from accounts where id = ?)
+                """;
+        assertThat(jdbc.update(updateKey, referenceB, requestA.key(), a.id())).isEqualTo(1);
+        try {
+            MvcResult corruptedReplay = send(requestA);
+            assertThat(corruptedReplay.getResponse().getStatus()).isEqualTo(500);
+            assertThat((String) read(corruptedReplay, "$.detail")).isEqualTo("An unexpected error occurred");
+            assertThat(corruptedReplay.getResponse().getContentAsString()).doesNotContain(referenceB, "Bob Receipt");
+        } finally {
+            jdbc.update(updateKey, referenceA, requestA.key(), a.id());
+        }
+        MvcResult replay = send(requestA);
+        assertThat(replay.getResponse().getStatus()).isEqualTo(201);
+        assertThat((String) read(replay, "$.reference")).isEqualTo(referenceA);
+        assertBalancesAndLedger(a, aTo, "60", "40");
+        assertBalancesAndLedger(b, bTo, "75", "25");
     }
 
     private MvcResult send(PendingTransfer request) throws Exception {

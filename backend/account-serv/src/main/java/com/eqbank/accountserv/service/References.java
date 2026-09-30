@@ -7,8 +7,8 @@ public final class References {
 
     private References() {}
 
-    /** Human-friendly ledger reference, e.g. {@code TX-7F3A9C21B4}. */
+    /** A complete random UUID, with a ledger prefix; never truncate its random bits. */
     public static String newReference() {
-        return "TX-" + UUID.randomUUID().toString().replace("-", "").substring(0, 10).toUpperCase(Locale.ROOT);
+        return "TX-" + UUID.randomUUID().toString().toUpperCase(Locale.ROOT);
     }
 }

@@ -32,10 +32,11 @@ public interface AccountRepository extends JpaRepository<Account, Long>, JpaSpec
 
     /**
      * Loads and row-locks an account for the duration of the current transaction so that
-     * concurrent balance changes are serialised.
+     * concurrent balance changes are serialised. Do not join-fetch the owner here:
+     * PostgreSQL must lock only accounts, after any explicit caller lock.
      */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select a from Account a join fetch a.owner where a.id = :id")
+    @Query("select a from Account a where a.id = :id")
     Optional<Account> findByIdForUpdate(@Param("id") Long id);
 
     @EntityGraph(attributePaths = "owner")

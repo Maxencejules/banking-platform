@@ -27,7 +27,7 @@ public class IdempotencyRecord {
     @Column(name = "request_hash", nullable = false, length = 64)
     private String requestHash;
 
-    @Column(name = "transfer_reference", nullable = false, length = 20)
+    @Column(name = "transfer_reference", nullable = false, length = 40)
     private String transferReference;
 
     @Column(name = "created_at", nullable = false)

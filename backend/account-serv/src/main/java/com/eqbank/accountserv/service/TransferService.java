@@ -14,11 +14,13 @@ import com.eqbank.accountserv.exception.ResourceNotFoundException;
 import com.eqbank.accountserv.repository.AccountRepository;
 import com.eqbank.accountserv.repository.IdempotencyRecordRepository;
 import com.eqbank.accountserv.repository.TransactionRepository;
+import com.eqbank.accountserv.repository.UserRepository;
 import com.eqbank.accountserv.security.AuthenticatedUser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
@@ -37,6 +39,7 @@ public class TransferService {
     private final AccountRepository accounts;
     private final TransactionRepository transactions;
     private final IdempotencyRecordRepository idempotencyRecords;
+    private final UserRepository users;
     private final AccountService accountService;
     private final LedgerService ledger;
     private final Clock clock;
@@ -44,12 +47,14 @@ public class TransferService {
     public TransferService(AccountRepository accounts,
                            TransactionRepository transactions,
                            IdempotencyRecordRepository idempotencyRecords,
+                           UserRepository users,
                            AccountService accountService,
                            LedgerService ledger,
                            Clock clock) {
         this.accounts = accounts;
         this.transactions = transactions;
         this.idempotencyRecords = idempotencyRecords;
+        this.users = users;
         this.accountService = accountService;
         this.ledger = ledger;
         this.clock = clock;
@@ -64,16 +69,21 @@ public class TransferService {
                 account.getCurrency());
     }
 
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public TransferResponse transfer(AuthenticatedUser caller, TransferRequest request, String idempotencyKey) {
         String requestHash = hash(request);
         if (idempotencyKey != null) {
+            // A caller lock precedes all account locks and serialises keyed requests across
+            // sources and API instances. READ_COMMITTED lets the lookup after a wait see
+            // the preceding transaction's committed key; failures roll back the key too.
+            users.findByIdForUpdate(caller.id())
+                    .orElseThrow(() -> new ResourceNotFoundException("User not found: " + caller.id()));
             var previous = idempotencyRecords.findByUserIdAndKey(caller.id(), idempotencyKey);
             if (previous.isPresent()) {
                 if (!previous.get().getRequestHash().equals(requestHash)) {
                     throw new ConflictException("Idempotency-Key was already used for a different transfer");
                 }
-                return replay(previous.get().getTransferReference());
+                return replay(previous.get().getTransferReference(), caller.id());
             }
         }
 
@@ -123,8 +133,8 @@ public class TransferService {
         return toResponse(out);
     }
 
-    private TransferResponse replay(String reference) {
-        Transaction out = transactions.findFirstByReferenceAndType(reference, TransactionType.TRANSFER_OUT)
+    private TransferResponse replay(String reference, Long ownerId) {
+        Transaction out = transactions.findByReferenceAndTypeAndAccountOwnerId(reference, TransactionType.TRANSFER_OUT, ownerId)
                 .orElseThrow(() -> new IllegalStateException("Missing ledger entry for " + reference));
         return toResponse(out);
     }

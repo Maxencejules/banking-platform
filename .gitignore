@@ -27,6 +27,8 @@ pnpm-debug.log*
 
 # Logs
 *.log
+__pycache__/
+*.pyc
 
 # OS
 .DS_Store

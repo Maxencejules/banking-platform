@@ -89,7 +89,7 @@ Errors use RFC 7807 `application/problem+json`:
 ```json
 {
   "id": 17,
-  "reference": "TX-7F3A9C21B4",
+  "reference": "TX-7F3A9C21-B4D5-4AB6-8B4E-C2A9D085D178",
   "type": "TRANSFER_OUT",
   "amount": 200.00,
   "balanceAfter": 1320.35,
@@ -100,6 +100,8 @@ Errors use RFC 7807 `application/problem+json`:
 ```
 `type`: `DEPOSIT` | `WITHDRAWAL` | `TRANSFER_IN` | `TRANSFER_OUT` | `INTEREST`.
 `amount` is always positive; direction is given by `type`.
+New references use `TX-` followed by a complete UUID; existing shorter references remain valid.
+Treat references as opaque strings.
 
 ## Endpoints
 
@@ -148,7 +150,7 @@ Business rules:
 TransferResponse:
 ```json
 {
-  "reference": "TX-7F3A9C21B4",
+  "reference": "TX-7F3A9C21-B4D5-4AB6-8B4E-C2A9D085D178",
   "fromAccount": { AccountResponse },
   "toAccountNumber": "100000000025",
   "amount": 200.00,
@@ -158,7 +160,17 @@ TransferResponse:
 }
 ```
 Rules: source must belong to the caller, both accounts `ACTIVE`, same currency, different accounts.
-Replaying a request with the same `Idempotency-Key` returns the original result (`201`) without moving money again.
+Replaying a request with the same `Idempotency-Key` returns the original transfer reference and
+details (`201`) without moving money again. `fromAccount` is the current source account view,
+so its balance/status/nickname may differ after later activity. The immutable ledger entry's
+`balanceAfter` records the balance immediately after the original transfer.
+
+Keys are scoped to the authenticated user and successful keys are retained without expiry.
+Concurrent requests with the same key wait for the first transaction, then replay or receive
+`409` if the payload differs. Amount scale is normalized (`40` equals `40.00`); source,
+destination and description participate in the hash. Failed transfers roll back both ledger
+legs and the key, allowing a later retry after the business condition is resolved. Transfers
+without a key and other money-movement endpoints do not provide retry deduplication.
 
 ### Admin (role `ADMIN` only)
 

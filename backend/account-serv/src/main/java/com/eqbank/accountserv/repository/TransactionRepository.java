@@ -29,7 +29,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long>,
     boolean existsByAccountIdAndTypeAndCreatedAtGreaterThanEqual(Long accountId, TransactionType type, Instant since);
 
     @EntityGraph(attributePaths = {"account", "account.owner"})
-    Optional<Transaction> findFirstByReferenceAndType(String reference, TransactionType type);
+    Optional<Transaction> findByReferenceAndTypeAndAccountOwnerId(String reference, TransactionType type, Long ownerId);
 
     List<Transaction> findByAccountIdAndCreatedAtBetweenOrderByCreatedAtAscIdAsc(Long accountId, Instant from, Instant to);
 }
