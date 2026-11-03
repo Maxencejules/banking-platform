@@ -1,5 +1,37 @@
 # MJ Banking Platform
 
+## Four requests, one transfer
+
+Four parallel requests reuse one retry key for the same CAD $25 transfer. The recorded
+PostgreSQL 16 and 17 CI demos finish with **Alice/Bob: $100/$0 → $75/$25**,
+one transfer reference, one debit and one credit.
+
+[Original failing test](https://github.com/Maxencejules/banking-platform/actions/runs/36652794015/job/109690529192) · [Lock-order fix and tradeoff](https://github.com/Maxencejules/banking-platform/pull/3) · [Passing CI run](https://github.com/Maxencejules/banking-platform/actions/runs/36655367122) · [Demo script](https://github.com/Maxencejules/banking-platform/blob/master/scripts/demo_api.py)
+
+### Try it locally
+
+From a checkout, start the disposable dev API with Java 21 (H2 with seeded demo data):
+
+```bash
+cd backend/account-serv
+./mvnw spring-boot:run
+```
+
+In a second terminal, from the repository root, with Python 3.10+:
+
+```bash
+python3 scripts/demo_api.py
+```
+
+The script creates fresh demo customers and accounts, so do not point it at a real database.
+For PostgreSQL setup and the Docker API URL, see [Running locally](#running-locally).
+The local quick start uses H2; the linked CI run is the PostgreSQL evidence.
+
+The fix serializes **keyed transfers per customer**, including unrelated transfers from that
+customer. This is a deliberately coarse lock, not a claim of production banking readiness.
+
+---
+
 A full-stack online banking platform built with **Spring Boot 4 (Java 21)** and **Angular 21**.
 Customers register, open chequing and savings accounts, move money, send transfers and download
 statements. Operations staff get a back-office console to search customers and accounts, freeze
